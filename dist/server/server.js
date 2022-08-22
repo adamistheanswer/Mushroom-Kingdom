@@ -15,7 +15,7 @@ const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
 const http_1 = __importDefault(require("http"));
 const socket_io_1 = require("socket.io");
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 class App {
     constructor(port) {
         this.clients = {};

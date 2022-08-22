@@ -13,7 +13,7 @@ import path from "path";
 import http from "http";
 import { Server, Socket } from "socket.io";
 
-const port: number | string = process.env.PORT || 5000;
+const port: any = process.env.PORT || 3000;
 
 class App {
   private server: http.Server;
