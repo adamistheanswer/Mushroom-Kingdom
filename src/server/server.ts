@@ -1,13 +1,3 @@
-// When starting this project by using `npm run dev`, this server script
-// will be compiled using tsc and will be running concurrently along side webpack-dev-server
-// visit http://127.0.0.1:8080
-
-// In the production environment we don't use the webpack-dev-server, so instead type,
-// `npm run build`        (this creates the production version of bundle.js and places it in ./dist/client/)
-// `tsc -p ./src/server`  (this compiles ./src/server/server.ts into ./dist/server/server.js)
-// `npm start            (this starts nodejs with express and serves the ./dist/client folder)
-// visit http://127.0.0.1:3000
-
 import express from "express";
 import path from "path";
 import http from "http";
@@ -39,7 +29,7 @@ class App {
       socket.emit("id", socket.id);
 
       socket.on("disconnect", () => {
-        console.log("socket disconnected : " + socket.id);
+        console.log("socket disconnected :  " + socket.id);
         if (this.clients && this.clients[socket.id]) {
           console.log("deleting " + socket.id);
           delete this.clients[socket.id];

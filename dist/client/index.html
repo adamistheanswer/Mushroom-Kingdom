@@ -1,32 +1,44 @@
 <!DOCTYPE html>
 <html>
-
-<head>
+  <head>
     <title>Three.js Multiplayer Test</title>
     <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <style>
-        body {
-            overflow: hidden;
-            margin: 0px;
-        }
+      * {
+        box-sizing: border-box;
+      }
 
-        #pingStats {
-            position: absolute;
-            top: 60px;
-            left: 4px;
-            width: 400px;
-            height: 400px;
-            pointer-events: none;
-            color: white;
-            font-family: monospace;
-        }
+      html,
+      body,
+      #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: black;
+      }
+
+      #pingStats {
+        position: absolute;
+        top: 60px;
+        left: 4px;
+        width: 400px;
+        height: 400px;
+        pointer-events: none;
+        color: white;
+        font-family: monospace;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div id="pingStats"></div>
+    <div id="root"></div>
+    <div id="joystickWrapper1"></div>
     <script type="module" src="bundle.js"></script>
-</body>
-
+  </body>
 </html>
