@@ -14,6 +14,7 @@ import {
   GridHelper,
   Object3D,
 } from "three";
+
 extend({
   Mesh,
   BoxGeometry,
