@@ -1,11 +1,13 @@
 /* eslint-disable */
 // @ts-nocheck
 import * as React from "react";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { Canvas, useFrame, extend } from "@react-three/fiber";
 import { Stats, OrbitControls } from "@react-three/drei";
 import { io } from "socket.io-client";
 import useAppStore from "./store";
+
+const socket = io();
 
 import {
   Mesh,
@@ -93,7 +95,6 @@ function Scene(props: SceneProps): JSX.Element {
 
 export default function App() {
   const localPositions: { [id: string]: any } = {};
-  const socket = io();
 
   const setUerId = useAppStore((state: any) => state.setUserId);
 
@@ -101,59 +102,70 @@ export default function App() {
     (state: any) => state.setLocalPositions
   );
 
-  socket.on("connect", function () {
-    console.log("connect");
-  });
-
-  socket.on("disconnect", function (message: any) {
-    console.log("disconnect " + message);
-  });
-
-  socket.on("id", (id: string) => {
-    setUerId(id);
-  });
-
-  socket.on("clients", (clients: any) => {
-    let pingStatsHtml = "Socket Ping Stats<br/><br/>";
-    Object.keys(clients).forEach((clientId) => {
-      pingStatsHtml +=
-        clientId + " " + (Date.now() - clients[clientId].t) + "ms<br/>";
-      if (!localPositions[clientId]) {
-        localPositions[clientId] = <UserObject key={clientId} />;
-      } else {
-        if (clients[clientId].p || clients[clientId].r) {
-          localPositions[clientId] = (
-            <UserObject
-              key={clientId}
-              rotation={
-                clients[clientId].r && [
-                  clients[clientId].r._x,
-                  clients[clientId].r._y,
-                  clients[clientId].r._z,
-                ]
-              }
-              position={
-                clients[clientId].p && [
-                  clients[clientId].p.x,
-                  clients[clientId].p.y,
-                  clients[clientId].p.z,
-                ]
-              }
-            />
-          );
-        }
-      }
-
-      setLocalPositions(localPositions);
+  useEffect(() => {
+    socket.on("connect", function () {
+      console.log("connect");
     });
 
-    (document.getElementById("pingStats") as HTMLDivElement).innerHTML =
-      pingStatsHtml;
-  });
+    socket.on("disconnect", function (message: any) {
+      console.log("disconnect " + message);
+    });
 
-  socket.on("removeClient", (clientId: string) => {
-    delete localPositions[clientId];
-  });
+
+    socket.on("id", (id: string) => {
+      setUerId(id);
+    });
+
+    socket.on("clients", (clients: any) => {
+      let pingStatsHtml = "Socket Ping Stats<br/><br/>";
+      Object.keys(clients).forEach((clientId) => {
+        pingStatsHtml +=
+          clientId + " " + (Date.now() - clients[clientId].t) + "ms<br/>";
+        if (!localPositions[clientId]) {
+          localPositions[clientId] = <UserObject key={clientId} />;
+        } else {
+          if (clients[clientId].p || clients[clientId].r) {
+            localPositions[clientId] = (
+              <UserObject
+                key={clientId}
+                rotation={
+                  clients[clientId].r && [
+                    clients[clientId].r._x,
+                    clients[clientId].r._y,
+                    clients[clientId].r._z,
+                  ]
+                }
+                position={
+                  clients[clientId].p && [
+                    clients[clientId].p.x,
+                    clients[clientId].p.y,
+                    clients[clientId].p.z,
+                  ]
+                }
+              />
+            );
+          }
+        }
+  
+        setLocalPositions(localPositions);
+      });
+  
+      (document.getElementById("pingStats") as HTMLDivElement).innerHTML =
+        pingStatsHtml;
+    });
+  
+    socket.on("removeClient", (clientId: string) => {
+      delete localPositions[clientId];
+    });
+
+    return () => {
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('id');
+      socket.off('clients');
+      socket.off('removeClient')
+    };
+  }, []);
 
   return (
     <Canvas camera={{ position: [0, 4, 4] }}>
