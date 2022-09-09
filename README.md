@@ -1,16 +1,14 @@
-# multiplayer-test
+<div align="center">
+<h1>R3F.Multiplayer</h1>
+<img src="https://i.imgur.com/hqehLwp.gif" /><br/>
+<p>React three fiber, socket.io boilerplate multiplayer server and client 💻</p>
+<!-- <img src="https://github.com/juniorxsound/R3F.Multiplayer/workflows/CI/badge.svg" /><br/> -->
+<a href="#getting-started">Getting started</a>
+</div>
 
-// When starting this project by using `npm run dev`, this server script
-// will be compiled using tsc and will be running concurrently along side webpack-dev-server
-// http://localhost:8080
+## Getting started
+To quickly get started
+- Clone the repository (`git clone git@github.com:juniorxsound/R3F.Multiplayer.git`)
+- Install dependencies (Run `yarn` / `npm install` inside the repo root)
+- Start the development server by running `yarn dev`
 
-// When building this project by using `npm run build`, the server is compiled with tsc &
-// the client bundle is built with webpack
-
-// To run the production build `npm run start`,
-// Static client code served by express server
-// http://localhost:3000
-
-Todo:
-Split bundle and use index HTML generated from webpack
-Tree Shake bundle
