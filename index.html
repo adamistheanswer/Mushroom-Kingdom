@@ -1,20 +1,26 @@
 <!DOCTYPE html>
 <html>
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Three.js Multiplayer Test</title>
+        <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" href="favicon.png" />
 
-<head>
-    <meta charset='utf-8'>
-    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <title>Three.js Multiplayer Test</title>
-    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="icon" type="image/png" href="favicon.png" />
+        <style>
+            @media (max-width: 1224px) {
+                #joystickWrapper1 {
+                    display: block;
+                }
+            }
+        </style>
+    </head>
 
-</head>
-
-<body>
-    <div id="pingStats"></div>
-    <div id="root"></div>
-    <script type="module" src="/src/index.tsx"></script>
-</body>
-
+    <body>
+        <div id="pingStats"></div>
+        <div id="joystickWrapper1"></div>
+        <div id="root"></div>
+        <script type="module" src="/src/index.tsx"></script>
+    </body>
 </html>

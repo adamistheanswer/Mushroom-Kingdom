@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Canvas, extend } from '@react-three/fiber'
-import { OrbitControls, Stats } from '@react-three/drei'
+import { Stats } from '@react-three/drei'
 import { io, Socket } from 'socket.io-client'
 import UserWrapper from './UserWrapper'
-// import FPSControls from './FirstPersonControls'
-import { FPSControls } from "react-three-fpscontrols";
 import { AmbientLight, SpotLight, PointLight, GridHelper } from 'three'
+import ControlsWrapper from './ControlsWrapper'
 
 extend({
     AmbientLight,
@@ -14,59 +13,13 @@ extend({
     GridHelper,
 })
 
-const ControlsWrapper = ({ clientSocket }) => {
-    const controlsRef = useRef<any>()
-    const [updateCallback, setUpdateCallback] = useState(null)
-
-
-    console.log(controlsRef)
-    // Register the update event and clean up
-    useEffect(() => {
-        const onControlsChange = (val) => {
-            const { position, rotation } = val.target.object
-            const { id } = clientSocket
-
-            const posArray = []
-            const rotArray = []
-
-            position.toArray(posArray)
-            rotation.toArray(rotArray)
-
-            clientSocket.emit('positionUpdate', {
-                id,
-                rotation: rotArray,
-                position: posArray,
-            })
-        }
-
-        if (controlsRef.current) {
-            setUpdateCallback(
-                controlsRef.current.addEventListener('change', onControlsChange)
-            )
-        }
-
-        // Dispose
-        return () => {
-            if (updateCallback && controlsRef.current)
-                controlsRef.current.removeEventListener(
-                    'change',
-                    onControlsChange
-                )
-        }
-    }, [controlsRef, clientSocket])
-
-    return <OrbitControls ref={controlsRef} />
-}
-
 function App() {
     const [clientSocket, setSocketClient] = useState<Socket | null>(null)
     const [clients, setClients] = useState({})
 
     useEffect(() => {
-        // On mount initialize the socket connection
         setSocketClient(io())
 
-        // Dispose gracefuly
         return () => {
             if (clientSocket) clientSocket.disconnect()
         }
@@ -74,8 +27,8 @@ function App() {
 
     useEffect(() => {
         if (clientSocket) {
-            clientSocket.on('clientUpdates', (clients) => {
-                setClients(clients)
+            clientSocket.on('clientUpdates', (updatedClients) => {
+                setClients(updatedClients)
             })
         }
     }, [clientSocket])
@@ -99,6 +52,7 @@ function App() {
                                 id={client}
                                 position={position}
                                 rotation={rotation}
+                                clientSocket={clientSocket}
                             />
                         )
                     })}

@@ -5,10 +5,8 @@ import { createServer } from 'vite'
 import viteConfig from './vite.config.js'
 import { Server } from 'socket.io'
 
-// Create router
 const router = Router()
 
-// Create vite front end dev server
 const vite = await createServer({
     configFile: false,
     server: {
@@ -17,22 +15,17 @@ const vite = await createServer({
     ...viteConfig,
 })
 
-// Main route serves the index HTML
 router.get('/', async (req, res, next) => {
     let html = fs.readFileSync('index.html', 'utf-8')
     html = await vite.transformIndexHtml(req.url, html)
     res.send(html)
 })
 
-// Use vite middleware so it rebuilds frontend
 router.use(vite.middlewares)
 
-// Everything else that's not index 404s
 router.use('*', (req, res) => {
     res.status(404).send({ message: 'Not Found' })
 })
-
-// Create express app and listen on port 4444
 
 const app = express()
 
