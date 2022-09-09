@@ -3,21 +3,17 @@ import express from 'express'
 import Router from 'express-promise-router'
 import { Server } from 'socket.io'
 
-// Create router
 const router = Router()
 
-// Main route serves the index HTML
 router.get('/', async (req, res, next) => {
     let html = fs.readFileSync('index.html', 'utf-8')
     res.send(html)
 })
 
-// Everything else that's not index 404s
 router.use('*', (req, res) => {
     res.status(404).send({ message: 'Not Found' })
 })
 
-// Create express app and listen on port 4444
 const app = express()
 app.use(express.static('dist'))
 app.use(router)
@@ -29,35 +25,31 @@ const ioServer = new Server(server)
 
 let clients = {}
 
-// Socket app msgs
-ioServer.on('connection', (client) => {
+ioServer.on('connection', (socket) => {
     console.log(
-        `User ${client.id} connected, there are currently ${ioServer.engine.clientsCount} users connected`
+        `User ${socket.id} connected - ${ioServer.engine.clientsCount} active users`
     )
 
-    //Add a new client indexed by his id
-    clients[client.id] = {
+    clients[socket.id] = {
         position: [0, 0, 0],
         rotation: [0, 0, 0],
     }
 
-    ioServer.sockets.emit('move', clients)
+    ioServer.sockets.emit('clientUpdates', clients)
 
-    client.on('move', ({ id, rotation, position }) => {
+    socket.on('positionUpdate', ({ id, rotation, position }) => {
         clients[id].position = position
         clients[id].rotation = rotation
-
-        ioServer.sockets.emit('move', clients)
+        ioServer.sockets.emit('clientUpdates', clients)
     })
 
-    client.on('disconnect', () => {
+    socket.on('disconnect', () => {
         console.log(
-            `User ${client.id} disconnected, there are currently ${ioServer.engine.clientsCount} users connected`
+            `User ${socket.id} disconnected - ${ioServer.engine.clientsCount} active users`
         )
 
-        //Delete this client from the object
-        delete clients[client.id]
+        delete clients[socket.id]
 
-        ioServer.sockets.emit('move', clients)
+        ioServer.sockets.emit('clientUpdate', clients)
     })
 })
