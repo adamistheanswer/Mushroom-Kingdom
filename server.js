@@ -8,7 +8,7 @@ import { Server } from 'socket.io'
 const router = Router()
 const app = express()
 
-if (process.env.ENVIRONMENT === 'dev') {
+if (process.env.ENVIRONMENT === 'local') {
     const vite = await createServer({
         configFile: false,
         server: {
@@ -23,7 +23,7 @@ if (process.env.ENVIRONMENT === 'dev') {
 
 router.get('/', async (req, res, next) => {
     let html = fs.readFileSync('index.html', 'utf-8')
-    if (process.env.ENVIRONMENT === 'dev') {
+    if (process.env.ENVIRONMENT === 'local') {
         html = await vite.transformIndexHtml(req.url, html)
     }
     res.send(html)
@@ -43,9 +43,6 @@ const ioServer = new Server(server)
 
 let clients = {}
 
-function arrComp(a1, a2) {
-    return a1?.every((v, i) => v === a2[i])
-}
 
 ioServer.on('connection', (socket) => {
     console.log(
@@ -60,17 +57,13 @@ ioServer.on('connection', (socket) => {
     ioServer.sockets.emit('clientUpdates', clients)
 
     socket.on('positionUpdate', ({ id, rotation, position }) => {
-        if (
-            !arrComp(clients[id]?.position, position) ||
-            !arrComp(clients[id]?.rotation, rotation)
-        ) {
-            if (clients[id]) {
-                clients[id].position = position
-                clients[id].rotation = rotation
-            }
 
-            ioServer.sockets.emit('clientUpdates', clients)
+        if (clients[id]) {
+            clients[id].position = position
+            clients[id].rotation = rotation
         }
+
+        ioServer.sockets.emit('clientUpdates', clients)
     })
 
     socket.on('disconnect', () => {

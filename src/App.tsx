@@ -52,7 +52,6 @@ function App() {
                                 id={client}
                                 position={position}
                                 rotation={rotation}
-                                clientSocket={clientSocket}
                             />
                         )
                     })}

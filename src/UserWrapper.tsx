@@ -8,7 +8,7 @@ extend({
     MeshNormalMaterial,
 })
 
-const UserWrapper = ({ position, rotation, id, clientSocket }) => {
+const UserWrapper = ({ position, rotation, id }) => {
     const boxGemo = useMemo(() => new BoxGeometry(), [])
     const boxMat = useMemo(() => new MeshNormalMaterial(), [])
     return (
@@ -19,7 +19,7 @@ const UserWrapper = ({ position, rotation, id, clientSocket }) => {
             material={boxMat}
         >
             <Text
-                rotation={clientSocket.id === id ? [0, 0, 0] : [0, Math.PI, 0]}
+                rotation={[0, Math.PI, 0]}
                 position={[0, 1, 0]}
                 color="aqua"
                 anchorX="center"

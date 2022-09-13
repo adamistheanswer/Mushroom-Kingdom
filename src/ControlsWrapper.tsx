@@ -36,8 +36,7 @@ function useJoystick({ isTabletOrMobile }: useJoystickProps) {
             joyManager = nipplejs.create({
                 zone: document.getElementById('joystickWrapper1')!,
                 size: 120,
-                multitouch: true,
-                maxNumberOfNipples: 2,
+                maxNumberOfNipples: 1,
                 mode: 'static',
                 restJoystick: true,
                 shape: 'circle',
@@ -82,7 +81,10 @@ const ControlsWrapper = ({ clientSocket }) => {
     const orbitRef = useRef<OrbitControlsImpl>(null)
     const camRef = useRef<any>()
     const meshRef = useRef<Mesh>(null)
-    const mult = 0.1
+    const velocity = 0.1
+
+    const lastHeading = useRef(0)
+    const lastPosition = useRef([0, 0, 0])
 
     const tempVector = useMemo(() => new Vector3(), [])
     const upVector = useMemo(() => new Vector3(0, 1, 0), [])
@@ -160,47 +162,74 @@ const ControlsWrapper = ({ clientSocket }) => {
         const controls = orbitRef.current
         const camera = camRef.current
         const { id } = clientSocket
- 
+
+        function arrIdentical(a1, a2) {
+            let i = a1.length
+            if (i != a2.length) return false
+            while (i--) {
+                if (a1[i] !== a2[i]) return false
+            }
+            return true
+        }
+
         if (mesh && controls && camera) {
-            const heading = controls.getAzimuthalAngle()
+            const heading = Number(controls.getAzimuthalAngle().toFixed(2))
 
             if (fwdValue > 0) {
                 tempVector
                     .set(0, 0, -fwdValue)
                     .applyAxisAngle(upVector, heading)
-                mesh.position.addScaledVector(tempVector, mult)
+                mesh.position.addScaledVector(tempVector, velocity)
             }
 
             if (bkdValue > 0) {
                 tempVector.set(0, 0, bkdValue).applyAxisAngle(upVector, heading)
-                mesh.position.addScaledVector(tempVector, mult)
+                mesh.position.addScaledVector(tempVector, velocity)
             }
 
             if (lftValue > 0) {
                 tempVector
                     .set(-lftValue, 0, 0)
                     .applyAxisAngle(upVector, heading)
-                mesh.position.addScaledVector(tempVector, mult)
+                mesh.position.addScaledVector(tempVector, velocity)
             }
 
             if (rgtValue > 0) {
                 tempVector.set(rgtValue, 0, 0).applyAxisAngle(upVector, heading)
-                mesh.position.addScaledVector(tempVector, mult)
+                mesh.position.addScaledVector(tempVector, velocity)
             }
 
             camera.position.sub(controls.target)
             controls.target.copy(mesh.position)
             camera.position.add(mesh.position)
-
             mesh.setRotationFromEuler(new Euler(0, heading, 0, 'XYZ'))
+
+            let meshPositionArr = mesh.position.toArray()
+            meshPositionArr[0] = Number(meshPositionArr[0].toFixed(2))
+            meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
+
+            if (
+                lastHeading.current === heading &&
+                arrIdentical(lastPosition.current, meshPositionArr)
+            ) {
+                return
+            }
+
+            if (lastHeading.current !== heading) {
+                lastHeading.current = heading
+            }
+
+            if (!arrIdentical(lastPosition.current, meshPositionArr)) {
+                lastPosition.current = meshPositionArr
+            }
 
             clientSocket.emit('positionUpdate', {
                 id,
                 rotation: [0, heading, 0],
-                position: mesh.position.toArray(),
+                position: meshPositionArr,
             })
         }
-    }, [meshRef, orbitRef, camRef, mult, clientSocket])
+    }, [meshRef, orbitRef, camRef, velocity, clientSocket])
 
     useFrame(() => {
         updatePlayer()
