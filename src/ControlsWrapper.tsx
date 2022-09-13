@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useEffect, useMemo } from 'react'
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
 import { useFrame, extend } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { Mesh, Vector3, Euler } from 'three'
+import { Mesh, Vector3, Euler, Raycaster, Vector2 } from 'three'
 import { useMediaQuery } from 'react-responsive'
 import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
@@ -77,7 +77,7 @@ const handleMove = (_: {}, data: any) => {
     }
 }
 
-const ControlsWrapper = ({ clientSocket }) => {
+const ControlsWrapper = ({ clientSocket, remoteColliders }) => {
     const orbitRef = useRef<OrbitControlsImpl>(null)
     const camRef = useRef<any>()
     const meshRef = useRef<Mesh>(null)
@@ -172,6 +172,27 @@ const ControlsWrapper = ({ clientSocket }) => {
             return true
         }
 
+        function checkPlayerBlocked(tempVector) {
+            let blocked = false
+
+            const intersects = new Raycaster(
+                mesh?.position.clone(),
+                tempVector
+            ).intersectObjects(remoteColliders.current)
+
+            let distances = intersects.map((player) => player.distance)
+
+            distances.forEach((distance) => {
+                if (distance < 1) {
+                    blocked = true
+                }
+            })
+
+            if (blocked) {
+                return true
+            }
+        }
+
         if (mesh && controls && camera) {
             const heading = Number(controls.getAzimuthalAngle().toFixed(2))
 
@@ -179,11 +200,21 @@ const ControlsWrapper = ({ clientSocket }) => {
                 tempVector
                     .set(0, 0, -fwdValue)
                     .applyAxisAngle(upVector, heading)
+
+                if (checkPlayerBlocked(tempVector)) {
+                    return
+                }
+
                 mesh.position.addScaledVector(tempVector, velocity)
             }
 
             if (bkdValue > 0) {
                 tempVector.set(0, 0, bkdValue).applyAxisAngle(upVector, heading)
+
+                if (checkPlayerBlocked(tempVector)) {
+                    return
+                }
+
                 mesh.position.addScaledVector(tempVector, velocity)
             }
 
@@ -191,11 +222,18 @@ const ControlsWrapper = ({ clientSocket }) => {
                 tempVector
                     .set(-lftValue, 0, 0)
                     .applyAxisAngle(upVector, heading)
+
+                if (checkPlayerBlocked(tempVector)) {
+                    return
+                }
                 mesh.position.addScaledVector(tempVector, velocity)
             }
 
             if (rgtValue > 0) {
                 tempVector.set(rgtValue, 0, 0).applyAxisAngle(upVector, heading)
+                if (checkPlayerBlocked(tempVector)) {
+                    return
+                }
                 mesh.position.addScaledVector(tempVector, velocity)
             }
 
