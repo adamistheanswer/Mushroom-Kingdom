@@ -8,15 +8,14 @@ import { Server } from 'socket.io'
 const router = Router()
 const app = express()
 
-let vite = await createServer({
-    configFile: false,
-    server: {
-        middlewareMode: true,
-    },
-    ...viteConfig,
-})
-
 if (process.env.ENVIRONMENT === 'dev') {
+    const vite = await createServer({
+        configFile: false,
+        server: {
+            middlewareMode: true,
+        },
+        ...viteConfig,
+    })
     router.use(vite.middlewares)
 } else {
     app.use(express.static('dist'))
@@ -33,8 +32,6 @@ router.get('/', async (req, res, next) => {
 router.use('*', (req, res) => {
     res.status(404).send({ message: 'Not Found' })
 })
-
-
 
 app.use(router)
 
@@ -67,8 +64,11 @@ ioServer.on('connection', (socket) => {
             !arrComp(clients[id]?.position, position) ||
             !arrComp(clients[id]?.rotation, rotation)
         ) {
-            clients[id].position = position
-            clients[id].rotation = rotation
+            if (clients[id]) {
+                clients[id].position = position
+                clients[id].rotation = rotation
+            }
+
             ioServer.sockets.emit('clientUpdates', clients)
         }
     })
