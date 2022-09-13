@@ -6,6 +6,7 @@ import viteConfig from './vite.config.js'
 import { Server } from 'socket.io'
 
 const router = Router()
+const app = express()
 
 let vite = await createServer({
     configFile: false,
@@ -15,6 +16,12 @@ let vite = await createServer({
     ...viteConfig,
 })
 
+if (process.env.ENVIRONMENT === 'dev') {
+    router.use(vite.middlewares)
+} else {
+    app.use(express.static('dist'))
+}
+
 router.get('/', async (req, res, next) => {
     let html = fs.readFileSync('index.html', 'utf-8')
     if (process.env.ENVIRONMENT === 'dev') {
@@ -23,15 +30,11 @@ router.get('/', async (req, res, next) => {
     res.send(html)
 })
 
-if (process.env.ENVIRONMENT === 'dev') {
-    router.use(vite.middlewares)
-}
-
 router.use('*', (req, res) => {
     res.status(404).send({ message: 'Not Found' })
 })
 
-const app = express()
+
 
 app.use(router)
 
