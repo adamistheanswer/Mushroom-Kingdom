@@ -160,7 +160,7 @@ const ControlsWrapper = ({ clientSocket }) => {
         const controls = orbitRef.current
         const camera = camRef.current
         const { id } = clientSocket
-
+ 
         if (mesh && controls && camera) {
             const heading = controls.getAzimuthalAngle()
 
@@ -216,7 +216,7 @@ const ControlsWrapper = ({ clientSocket }) => {
             />
             <OrbitControls
                 autoRotate={false}
-                enableDamping={true}
+                enableDamping={false}
                 enableZoom={false}
                 enablePan={false}
                 autoRotateSpeed={0}
@@ -229,7 +229,7 @@ const ControlsWrapper = ({ clientSocket }) => {
                 <Text
                     rotation={[0, 0, 0]}
                     position={[0, 1, 0]}
-                    color="aqua"
+                    color="yellow"
                     anchorX="center"
                     anchorY="middle"
                 >
