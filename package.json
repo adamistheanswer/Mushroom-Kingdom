@@ -26,5 +26,8 @@
         "react-dom": "^18.2.0",
         "socket.io-client": "^4.5.2",
         "three": "^0.143.0"
+    },
+    "engines": {
+        "node": "16.x.x"
     }
 }
