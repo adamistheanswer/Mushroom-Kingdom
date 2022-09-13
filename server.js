@@ -1,22 +1,40 @@
 import fs from 'fs'
 import express from 'express'
 import Router from 'express-promise-router'
+import { createServer } from 'vite'
+import viteConfig from './vite.config.js'
 import { Server } from 'socket.io'
 
 const router = Router()
 
+let vite = await createServer({
+    configFile: false,
+    server: {
+        middlewareMode: true,
+    },
+    ...viteConfig,
+})
+
 router.get('/', async (req, res, next) => {
     let html = fs.readFileSync('index.html', 'utf-8')
+    if (process.env.ENVIRONMENT === 'dev') {
+        html = await vite.transformIndexHtml(req.url, html)
+    }
     res.send(html)
 })
+
+if (process.env.ENVIRONMENT === 'dev') {
+    router.use(vite.middlewares)
+}
 
 router.use('*', (req, res) => {
     res.status(404).send({ message: 'Not Found' })
 })
 
 const app = express()
-app.use(express.static('dist'))
+
 app.use(router)
+
 const server = app.listen(process.env.PORT || 8080, () => {
     console.log(`Listening on port http://localhost:8080...`)
 })
@@ -24,6 +42,10 @@ const server = app.listen(process.env.PORT || 8080, () => {
 const ioServer = new Server(server)
 
 let clients = {}
+
+function arrComp(a1, a2) {
+    return a1?.every((v, i) => v === a2[i])
+}
 
 ioServer.on('connection', (socket) => {
     console.log(
@@ -38,9 +60,14 @@ ioServer.on('connection', (socket) => {
     ioServer.sockets.emit('clientUpdates', clients)
 
     socket.on('positionUpdate', ({ id, rotation, position }) => {
-        clients[id].position = position
-        clients[id].rotation = rotation
-        ioServer.sockets.emit('clientUpdates', clients)
+        if (
+            !arrComp(clients[id]?.position, position) ||
+            !arrComp(clients[id]?.rotation, rotation)
+        ) {
+            clients[id].position = position
+            clients[id].rotation = rotation
+            ioServer.sockets.emit('clientUpdates', clients)
+        }
     })
 
     socket.on('disconnect', () => {
