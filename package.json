@@ -7,6 +7,7 @@
         "format": "prettier --write \"src/*.{js,jsx,json,md,ts,tsx,css}\""
     },
     "dependencies": {
+        "@vitejs/plugin-react": "^2.1.0",
         "express": "^4.17.3",
         "express-promise-router": "^4.1.1",
         "nipplejs": "^0.9.1",
@@ -19,7 +20,6 @@
         "@react-three/drei": "^9.29.1",
         "@react-three/fiber": "^8.7.2",
         "@types/three": "^0.144.0",
-        "@vitejs/plugin-react": "^2.1.0",
         "dotenv": "^16.0.2",
         "nodemon": "^2.0.15",
         "react": "^18.2.0",
