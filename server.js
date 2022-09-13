@@ -6,6 +6,7 @@ import viteConfig from './vite.config.js'
 import { Server } from 'socket.io'
 
 const router = Router()
+const app = express()
 
 let vite = await createServer({
     configFile: false,
@@ -33,7 +34,7 @@ router.use('*', (req, res) => {
     res.status(404).send({ message: 'Not Found' })
 })
 
-const app = express()
+
 
 app.use(router)
 
