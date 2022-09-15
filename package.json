@@ -30,9 +30,5 @@
     },
     "engines": {
         "node": "16.x.x"
-    },
-    "optionalDependencies": {
-        "bufferutil": "^4.0.6",
-        "utf-8-validate": "^5.0.9"
     }
 }

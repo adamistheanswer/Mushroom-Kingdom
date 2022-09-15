@@ -22,7 +22,7 @@ if (process.env.ENVIRONMENT === 'local') {
     app.use(express.static('dist'))
 }
 
-router.get('/', async (req, res, next) => {
+router.get('/', async (req, res) => {
     let html = fs.readFileSync('index.html', 'utf-8')
     if (process.env.ENVIRONMENT === 'local') {
         html = await vite.transformIndexHtml(req.url, html)
@@ -62,12 +62,12 @@ ioServer.on('connection', (socket) => {
             clients[socket.id].r = r
         }
 
-        ioServer.sockets.emit('clientUpdates', clients)
+        // ioServer.sockets.emit('clientUpdates', clients)
     })
 
-    // setInterval(() => {
-    //     ioServer.sockets.emit('clientUpdates', clients)
-    // }, 100)
+    setInterval(() => {
+        ioServer.sockets.emit('clientUpdates', clients)
+    }, 100)
 
     socket.on('disconnect', () => {
         console.log(
