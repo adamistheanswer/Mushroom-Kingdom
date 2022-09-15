@@ -14,7 +14,7 @@ const UserWrapper = ({ position, rotation, id }) => {
     return (
         <mesh
             position={position}
-            rotation={rotation}
+            rotation={[0, rotation, 0]}
             geometry={boxGemo}
             material={boxMat}
         >

@@ -161,7 +161,6 @@ const ControlsWrapper = ({ clientSocket, remoteColliders }) => {
         const mesh = meshRef.current
         const controls = orbitRef.current
         const camera = camRef.current
-        const { id } = clientSocket
 
         function arrIdentical(a1, a2) {
             let i = a1.length
@@ -261,10 +260,9 @@ const ControlsWrapper = ({ clientSocket, remoteColliders }) => {
                 lastPosition.current = meshPositionArr
             }
 
-            clientSocket.emit('positionUpdate', {
-                id,
-                rotation: [0, heading, 0],
-                position: meshPositionArr,
+            clientSocket.emit('move', {
+                r: heading,
+                p: meshPositionArr,
             })
         }
     }, [meshRef, orbitRef, camRef, velocity, clientSocket])
