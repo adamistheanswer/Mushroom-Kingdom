@@ -1,6 +1,5 @@
 {
     "type": "module",
-    "name": "r3f-multiplayer",
     "scripts": {
         "build": "vite build",
         "dev": "nodemon -r dotenv/config server.js",
@@ -30,7 +29,7 @@
         "three": "^0.143.0"
     },
     "engines": {
-        "node": "18.x"
+        "node": "16.17.0"
     },
     "optionalDependencies": {
         "bufferutil": "^4.0.6",
