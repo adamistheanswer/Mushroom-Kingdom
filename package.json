@@ -29,7 +29,7 @@
         "three": "^0.143.0"
     },
     "engines": {
-        "node": "18.x.x"
+        "node": "18.x"
     },
     "optionalDependencies": {
         "bufferutil": "^4.0.6",
