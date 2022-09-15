@@ -29,6 +29,10 @@
         "three": "^0.143.0"
     },
     "engines": {
-        "node": "16.x.x"
+        "node": "18.8.0"
+    },
+    "optionalDependencies": {
+        "bufferutil": "^4.0.6",
+        "utf-8-validate": "^5.0.9"
     }
 }
