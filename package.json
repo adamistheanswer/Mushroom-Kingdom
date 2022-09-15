@@ -1,5 +1,6 @@
 {
     "type": "module",
+    "name": "r3f-multiplayer",
     "scripts": {
         "build": "vite build",
         "dev": "nodemon -r dotenv/config server.js",
