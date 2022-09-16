@@ -10,72 +10,94 @@ const router = Router()
 const app = express()
 
 if (process.env.ENVIRONMENT === 'local') {
-    const vite = await createServer({
-        configFile: false,
-        server: {
-            middlewareMode: true,
-        },
-        ...viteConfig,
-    })
-    router.use(vite.middlewares)
+   const vite = await createServer({
+      configFile: false,
+      server: {
+         middlewareMode: true,
+      },
+      ...viteConfig,
+   })
+   router.use(vite.middlewares)
 } else {
-    app.use(express.static('dist'))
+   app.use(express.static('dist'))
 }
 
 router.get('/', async (req, res) => {
-    let html = fs.readFileSync('index.html', 'utf-8')
-    if (process.env.ENVIRONMENT === 'local') {
-        html = await vite.transformIndexHtml(req.url, html)
-    }
-    res.send(html)
+   let html = fs.readFileSync('index.html', 'utf-8')
+   if (process.env.ENVIRONMENT === 'local') {
+      html = await vite.transformIndexHtml(req.url, html)
+   }
+   res.send(html)
 })
 
 router.use('*', (req, res) => {
-    res.status(404).send({ message: 'Not Found' })
+   res.status(404).send({ message: 'Not Found' })
 })
 
 app.use(router)
 
 const server = app.listen(process.env.PORT || 8080, () => {
-    console.log(`Listening on port http://localhost:8080...`)
+   console.log(`Listening on port http://localhost:8080...`)
 })
 
 const ioServer = new Server(server, { parser })
 
 let clients = {}
+let objects = []
 
 ioServer.on('connection', (socket) => {
-    console.log(
-        `User ${socket.id} connected - ${ioServer.engine.clientsCount} active users`
-    )
+   console.log(
+      `User ${socket.id} connected - ${ioServer.engine.clientsCount} active users`
+   )
 
-    clients[socket.id] = {
-        p: [0, 0, 0],
-        r: 0,
-    }
+   clients[socket.id] = {
+      p: [0, 0, 0],
+      r: 0,
+   }
 
-    ioServer.sockets.emit('clientUpdates', clients)
+   if (objects.length === 0) {
+      let newObjects = new Array(100)
 
-    socket.on('move', ({ r, p }) => {
-        if (clients[socket.id]) {
-            clients[socket.id].p = p
-            clients[socket.id].r = r
-        }
+      for (let i = 0; i < newObjects.length; i++) {
+         newObjects[i] = [
+            Math.floor(Math.random() * 13),
+            Math.ceil(Math.random() * 450) *
+               (Math.round(Math.random()) ? 1 : -1),
 
-        // ioServer.sockets.emit('clientUpdates', clients)
-    })
+            Math.ceil(Math.random() * 450) *
+               (Math.round(Math.random()) ? 1 : -1),
+         ]
+      }
 
-    setInterval(() => {
-        ioServer.sockets.emit('clientUpdates', clients)
-    }, 100)
+      objects = newObjects
+      socket.emit('objects', newObjects)
+   } else {
+      socket.emit('objects', objects)
+   }
 
-    socket.on('disconnect', () => {
-        console.log(
-            `User ${socket.id} disconnected - ${ioServer.engine.clientsCount} active users`
-        )
+   ioServer.sockets.emit('clientUpdates', clients)
 
-        delete clients[socket.id]
+   socket.on('move', ({ r, p }) => {
+      if (clients[socket.id]) {
+         clients[socket.id].p = p
+         clients[socket.id].r = r
+      }
+   })
 
-        ioServer.sockets.emit('clientUpdate', clients)
-    })
+   setInterval(() => {
+      ioServer.sockets.emit('clientUpdates', clients)
+   }, 100)
+
+   socket.on('disconnect', () => {
+      console.log(
+         `User ${socket.id} disconnected - ${ioServer.engine.clientsCount} active users`
+      )
+
+      if (Object.keys(clients).length === 1) {
+         objects = []
+      }
+
+      delete clients[socket.id]
+      ioServer.sockets.emit('clientUpdate', clients)
+   })
 })

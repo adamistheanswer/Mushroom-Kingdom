@@ -8,10 +8,6 @@ body,
    overflow: hidden;
 }
 
-body {
-   background: black;
-}
-
 #pingStats {
    position: absolute;
    top: 60px;

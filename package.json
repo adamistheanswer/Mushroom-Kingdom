@@ -13,6 +13,7 @@
         "nipplejs": "^0.9.1",
         "prettier": "^2.7.1",
         "react-responsive": "^9.0.0-beta.10",
+        "simplex-noise": "^4.0.0",
         "socket.io": "^4.5.2",
         "socket.io-msgpack-parser": "^3.0.1",
         "vite": "3.1.0"
@@ -26,7 +27,8 @@
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "socket.io-client": "^4.5.2",
-        "three": "^0.143.0"
+        "three": "^0.143.0",
+        "vite-plugin-static-copy": "^0.9.0"
     },
     "engines": {
         "node": "16.17.0"
