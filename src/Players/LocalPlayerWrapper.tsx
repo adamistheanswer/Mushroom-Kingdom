@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useEffect, useMemo } from 'react'
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
 import { useFrame, extend } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { Mesh, Vector3, Euler, Raycaster, Vector2 } from 'three'
+import { Mesh, Vector3, Euler, Raycaster } from 'three'
 import { useMediaQuery } from 'react-responsive'
 import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
@@ -77,18 +77,18 @@ const handleMove = (_: {}, data: any) => {
    }
 }
 
-const ControlsWrapper = ({ clientSocket, remoteColliders }) => {
+const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
    const meshRef = useRef<Mesh>(null)
-   const velocity = 0.1
+   const velocity = 1
 
    const lastHeading = useRef(0)
    const lastPosition = useRef([0, 0, 0])
 
    const tempVector = useMemo(() => new Vector3(), [])
    const upVector = useMemo(() => new Vector3(0, 1, 0), [])
-   const boxGemo = useMemo(() => new BoxGeometry(), [])
+   const boxGemo = useMemo(() => new BoxGeometry(10, 10, 10), [])
    const boxMat = useMemo(() => new MeshNormalMaterial(), [])
 
    const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
@@ -239,6 +239,7 @@ const ControlsWrapper = ({ clientSocket, remoteColliders }) => {
 
          let meshPositionArr = mesh.position.toArray()
          meshPositionArr[0] = Number(meshPositionArr[0].toFixed(2))
+         meshPositionArr[1] = 5
          meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
 
          if (
@@ -270,7 +271,7 @@ const ControlsWrapper = ({ clientSocket, remoteColliders }) => {
    return (
       <>
          <PerspectiveCamera
-            position={[0, 3, 5]}
+            position={[25, 10, 25]}
             fov={70}
             ref={camRef}
             makeDefault
@@ -286,10 +287,18 @@ const ControlsWrapper = ({ clientSocket, remoteColliders }) => {
             target={[0, 0, 0]}
             ref={orbitRef}
          />
-         <mesh ref={meshRef} geometry={boxGemo} material={boxMat}>
+         <mesh
+            ref={meshRef}
+            position={[0, 5, 0]}
+            geometry={boxGemo}
+            material={boxMat}
+            castShadow
+            receiveShadow
+         >
             <Text
                rotation={[0, 0, 0]}
-               position={[0, 1, 0]}
+               position={[0, 7, 0]}
+               fontSize={1}
                color="yellow"
                anchorX="center"
                anchorY="middle"
@@ -301,4 +310,4 @@ const ControlsWrapper = ({ clientSocket, remoteColliders }) => {
    )
 }
 
-export default ControlsWrapper
+export default LocalPlayerWrapper

@@ -1,105 +1,90 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, Suspense, useRef } from 'react'
 import { Canvas, extend } from '@react-three/fiber'
-import { Stats } from '@react-three/drei'
+import { Stats, Loader } from '@react-three/drei'
 import { io, Socket } from 'socket.io-client'
 import parser from 'socket.io-msgpack-parser'
-import UserWrapper from './UserWrapper'
+import AllPlayersWrapper from './Players/AllPlayersWrapper'
+import Ground from './Environment/Ground'
 
 import {
-    AmbientLight,
-    SpotLight,
-    PointLight,
-    GridHelper,
-    Mesh,
-    BoxGeometry,
-    Material,
+   AmbientLight,
+   DirectionalLight,
+   HemisphereLight,
+   Color,
+   Fog,
 } from 'three'
-import ControlsWrapper from './ControlsWrapper'
+import Forest from './Environment/Forest'
 
 extend({
-    AmbientLight,
-    SpotLight,
-    PointLight,
-    GridHelper,
+   Fog,
+   Color,
+   AmbientLight,
+   DirectionalLight,
+   HemisphereLight,
 })
 
-function App() {
-    const [clientSocket, setSocketClient] = useState<Socket | null>(null)
-    const [clients, setClients] = useState({})
+const App: React.FC = () => {
+   const [clientSocket, setSocketClient] = useState<Socket | null>(null)
+   const forestObjects = useRef([])
 
-    const boxGemo = useMemo(() => new BoxGeometry(1, 1, 1), [])
-    const remoteColliders = useRef<any>([])
+   useEffect(() => {
+      setSocketClient(io({ parser }))
 
-    useEffect(() => {
-        setSocketClient(io({ parser }))
+      return () => {
+         if (clientSocket) clientSocket.disconnect()
+      }
+   }, [])
 
-        return () => {
-            if (clientSocket) clientSocket.disconnect()
-        }
-    }, [])
+   useEffect(() => {
+      if (clientSocket) {
+         clientSocket.on('objects', (objects) => {
+            console.log(objects)
+            forestObjects.current = objects
+         })
+      }
+   }, [clientSocket])
 
-    useEffect(() => {
-        if (clientSocket) {
-            let cols: Mesh<BoxGeometry, Material | Material[]>[] = []
-            Object.keys(clients)
-                .filter((clientKey) => clientKey !== clientSocket.id)
-                .map((client) => {
-                    const { p, r } = clients[client]
-
-                    let player = new Mesh(boxGemo)
-                    player.position.set(p[0], p[1], p[2])
-                    player.rotation.set(0, r, 0, 'XYZ')
-                    player.updateMatrixWorld(true)
-                    cols.push(player)
-                })
-            remoteColliders.current = cols
-        }
-    }, [clients])
-
-    useEffect(() => {
-        if (clientSocket) {
-            clientSocket.on('clientUpdates', (updatedClients) => {
-                setClients(updatedClients)
-            })
-        }
-    }, [clients])
-
-    useEffect(() => {
-        if (clientSocket) {
-            clientSocket.on('clientUpdates', (updatedClients) => {
-                setClients(updatedClients)
-            })
-        }
-    }, [clientSocket])
-
-    return (
-        clientSocket && (
-            <Canvas camera={{ position: [0, 4, 4] }}>
-                <Stats />
-                <ambientLight intensity={0.5} />
-                <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
-                <pointLight position={[-10, -10, -10]} />
-                <gridHelper position-y={-0.5} />
-                <ControlsWrapper
-                    clientSocket={clientSocket}
-                    remoteColliders={remoteColliders}
-                />
-                {Object.keys(clients)
-                    .filter((clientKey) => clientKey !== clientSocket.id)
-                    .map((client) => {
-                        const { p, r } = clients[client]
-                        return (
-                            <UserWrapper
-                                key={client}
-                                id={client}
-                                position={p}
-                                rotation={r}
-                            />
-                        )
-                    })}
+   return (
+      clientSocket && (
+         <>
+            <Canvas shadows camera={{ position: [0, 4, 4] }}>
+               <Stats />
+               <color attach="background" args={['#444444']} />
+               <fog attach="fog" color="#444444" near={50} far={300} />
+               <hemisphereLight
+                  args={[0xffffff, 0xfffffff, 0.6]}
+                  color={[0.6, 1, 0.6]}
+                  groundColor={[0.095, 1, 0.75]}
+               />
+               <directionalLight
+                  args={[0xffffff, 0.5]}
+                  position={[-100, 100, 100]}
+                  position-target={[0, 0, 0]}
+                  shadow-bias={-0.001}
+                  shadow-mapSize-width={2048}
+                  shadow-mapSize-height={2048}
+                  shadow-camera-near={0.1}
+                  shadow-camera-far={500}
+                  shadow-camera-left={100}
+                  shadow-camera-right={-100}
+                  shadow-camera-top={100}
+                  shadow-camera-bottom={-100}
+                  castShadow
+               />
+               <ambientLight intensity={0.1} />
+               <Suspense fallback={null}>
+                  <AllPlayersWrapper clientSocket={clientSocket} />
+                  <Ground />
+                  <Forest objectPositions={forestObjects} />
+               </Suspense>
             </Canvas>
-        )
-    )
+            <Loader
+               dataInterpolation={(p) => `Loading ${p.toFixed(2)}%`}
+               initialState={(active) => active}
+            />
+         </>
+      )
+   )
 }
 
 export default App
