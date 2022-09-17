@@ -28,7 +28,15 @@ extend({
 const AllPlayersWrapper = ({ clientSocket }) => {
    const [clients, setClients] = useState({})
    const remoteColliders = useRef<any>([])
-   const boxGemo = useMemo(() => new BoxGeometry(1, 1, 1), [])
+   const boxGemo = useMemo(() => new BoxGeometry(20, 20, 20), [])
+
+   useEffect(() => {
+      if (clientSocket) {
+         clientSocket.on('clientUpdates', (updatedClients) => {
+            setClients(updatedClients)
+         })
+      }
+   }, [clientSocket])
 
    useEffect(() => {
       if (clientSocket) {
@@ -41,20 +49,12 @@ const AllPlayersWrapper = ({ clientSocket }) => {
                let player = new Mesh(boxGemo)
                player.position.set(p[0], p[1], p[2])
                player.rotation.set(0, r, 0, 'XYZ')
-               player.updateMatrixWorld(true)
+               player.updateMatrixWorld()
                cols.push(player)
             })
          remoteColliders.current = cols
       }
    }, [clients])
-
-   useEffect(() => {
-      if (clientSocket) {
-         clientSocket.on('clientUpdates', (updatedClients) => {
-            setClients(updatedClients)
-         })
-      }
-   }, [clientSocket])
 
    return (
       <>

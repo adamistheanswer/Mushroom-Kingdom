@@ -281,9 +281,7 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             enableDamping={false}
             enableZoom={false}
             enablePan={false}
-            autoRotateSpeed={0}
             rotateSpeed={0.4}
-            dampingFactor={0.1}
             target={[0, 0, 0]}
             ref={orbitRef}
          />
