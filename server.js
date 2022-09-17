@@ -90,7 +90,7 @@ ioServer.on('connection', (socket) => {
          ]
       }
 
-      largeScenery = newSmallScenery
+      smallScenery = newSmallScenery
       socket.emit('smallScenery', newSmallScenery)
    } else {
       socket.emit('smallScenery', smallScenery)
