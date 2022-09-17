@@ -54,6 +54,7 @@ ioServer.on('connection', (socket) => {
    clients[socket.id] = {
       p: [0, 0, 0],
       r: 0,
+      s: 'idle',
    }
 
    if (largeScenery.length === 0) {

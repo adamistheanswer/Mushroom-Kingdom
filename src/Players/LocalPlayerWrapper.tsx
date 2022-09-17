@@ -1,11 +1,18 @@
 import React, { useRef, useCallback, useEffect, useMemo } from 'react'
-import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
+import {
+   OrbitControls,
+   PerspectiveCamera,
+   Text,
+   useFBX,
+   useTexture,
+} from '@react-three/drei'
 import { useFrame, extend } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { Mesh, Vector3, Euler, Raycaster } from 'three'
+import { Mesh, Vector3, Euler, Raycaster, Group, TextureLoader } from 'three'
 import { useMediaQuery } from 'react-responsive'
 import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
+import Player from './Player'
 
 extend({
    BoxGeometry,
@@ -80,7 +87,7 @@ const handleMove = (_: {}, data: any) => {
 const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
-   const meshRef = useRef<Mesh>(null)
+   const meshRef = useRef<Mesh | Group>(null)
    const velocity = 1
 
    const lastHeading = useRef(0)
@@ -88,8 +95,10 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
 
    const tempVector = useMemo(() => new Vector3(), [])
    const upVector = useMemo(() => new Vector3(0, 1, 0), [])
-   const boxGemo = useMemo(() => new BoxGeometry(10, 10, 10), [])
-   const boxMat = useMemo(() => new MeshNormalMaterial(), [])
+   // const boxGemo = useMemo(() => new BoxGeometry(10, 10, 10), [])
+   // const boxMat = useMemo(() => new MeshNormalMaterial(), [])
+
+   // console.log('hit')
 
    const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
 
@@ -268,6 +277,18 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
       updatePlayer()
    })
 
+   let model = useFBX('../Models/Player/Mushy.fbx')
+   model.scale.setScalar(0.015)
+   model.traverse((child: any) => {
+      if (child.isSkinnedMesh) {
+         const texture = useTexture('../Models/Player/mushySkin.png')
+         child.material[1].map = texture
+         child.material.needsupdate = true
+         child.castShadow = true
+         child.receiveShadow = true
+      }
+   })
+
    return (
       <>
          <PerspectiveCamera
@@ -283,19 +304,14 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             enablePan={false}
             rotateSpeed={0.4}
             target={[0, 0, 0]}
+            // minPolarAngle={Math.PI / 2}
+            maxPolarAngle={Math.PI / 2 - 0.1}
             ref={orbitRef}
          />
-         <mesh
-            ref={meshRef}
-            position={[0, 5, 0]}
-            geometry={boxGemo}
-            material={boxMat}
-            castShadow
-            receiveShadow
-         >
+         <group ref={meshRef}>
             <Text
                rotation={[0, 0, 0]}
-               position={[0, 7, 0]}
+               position={[0, 13, 0]}
                fontSize={1}
                color="yellow"
                anchorX="center"
@@ -303,7 +319,8 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             >
                {clientSocket.id}
             </Text>
-         </mesh>
+            <primitive position={[0, 1.2, 0]} object={model} ref={meshRef} />
+         </group>
       </>
    )
 }

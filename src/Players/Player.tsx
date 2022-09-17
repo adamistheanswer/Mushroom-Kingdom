@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
-import { Text } from '@react-three/drei'
-import { extend } from '@react-three/fiber'
+import { Text, useFBX, useTexture } from '@react-three/drei'
+import { extend, useThree } from '@react-three/fiber'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
 
 extend({
@@ -9,21 +9,44 @@ extend({
 })
 
 const Player = ({ position, rotation, id }) => {
-   const boxGemo = useMemo(() => new BoxGeometry(10, 10, 10), [])
-   const boxMat = useMemo(() => new MeshNormalMaterial(), [])
+   // const model = useFBX('../Models/Player/mushy.fbx')
+   // let clonedModel = model.clone()
+   // console.log(clonedModel)
+   // clonedModel.scale.setScalar(0.015)
+   // clonedModel.traverse(
+   //    (f: { castShadow: boolean; receiveShadow: boolean }) => {
+   //       f.castShadow = true
+   //       f.receiveShadow = true
+   //    }
+   // )
+
+   let model = useFBX('../Models/Player/Mushy.fbx')
+   model.scale.setScalar(0.015)
+   model.traverse((child: any) => {
+      if (child.isSkinnedMesh) {
+         const texture = useTexture('../Models/Player/mushySkin.png')
+         child.material[0].map = texture
+         child.material.needsupdate = true
+         child.castShadow = true
+         child.receiveShadow = true
+      }
+   })
+
+   let clonedModel = model.clone()
+
+   const { camera } = useThree()
 
    return (
-      <mesh
-         position={[position[0], 5, position[2]]}
-         rotation={[0, rotation, 0]}
-         geometry={boxGemo}
-         material={boxMat}
-         castShadow
-         receiveShadow
-      >
+      <>
+         <primitive
+            position={[position[0], 1.1, position[2]]}
+            rotation={[0, rotation, 0]}
+            object={clonedModel}
+         />
+
          <Text
-            rotation={[0, Math.PI, 0]}
-            position={[0, 7, 0]}
+            rotation={[camera.rotation.x, camera.rotation.y, camera.rotation.z]}
+            position={[position[0], 13, position[2]]}
             fontSize={1}
             color="aqua"
             anchorX="center"
@@ -31,7 +54,7 @@ const Player = ({ position, rotation, id }) => {
          >
             {id}
          </Text>
-      </mesh>
+      </>
    )
 }
 
