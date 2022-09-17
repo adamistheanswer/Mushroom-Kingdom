@@ -43,7 +43,8 @@ const server = app.listen(process.env.PORT || 8080, () => {
 const ioServer = new Server(server, { parser })
 
 let clients = {}
-let objects = []
+let largeScenery = []
+let smallScenery = []
 
 ioServer.on('connection', (socket) => {
    console.log(
@@ -55,24 +56,44 @@ ioServer.on('connection', (socket) => {
       r: 0,
    }
 
-   if (objects.length === 0) {
-      let newObjects = new Array(100)
+   if (largeScenery.length === 0) {
+      let newLargeObjects = new Array(125)
 
-      for (let i = 0; i < newObjects.length; i++) {
-         newObjects[i] = [
-            Math.floor(Math.random() * 13),
-            Math.ceil(Math.random() * 450) *
+      for (let i = 0; i < newLargeObjects.length; i++) {
+         newLargeObjects[i] = [
+            Math.floor(Math.random() * 12),
+            Math.ceil(Math.random() * 475) *
                (Math.round(Math.random()) ? 1 : -1),
 
-            Math.ceil(Math.random() * 450) *
+            Math.ceil(Math.random() * 475) *
                (Math.round(Math.random()) ? 1 : -1),
          ]
       }
 
-      objects = newObjects
-      socket.emit('objects', newObjects)
+      largeScenery = newLargeObjects
+      socket.emit('largeScenery', newLargeObjects)
    } else {
-      socket.emit('objects', objects)
+      socket.emit('largeScenery', largeScenery)
+   }
+
+   if (smallScenery.length === 0) {
+      let newSmallScenery = new Array(400)
+
+      for (let i = 0; i < newSmallScenery.length; i++) {
+         newSmallScenery[i] = [
+            Math.floor(Math.random() * 22),
+            Math.ceil(Math.random() * 500) *
+               (Math.round(Math.random()) ? 1 : -1),
+
+            Math.ceil(Math.random() * 500) *
+               (Math.round(Math.random()) ? 1 : -1),
+         ]
+      }
+
+      largeScenery = newSmallScenery
+      socket.emit('smallScenery', newSmallScenery)
+   } else {
+      socket.emit('smallScenery', smallScenery)
    }
 
    ioServer.sockets.emit('clientUpdates', clients)
@@ -94,7 +115,8 @@ ioServer.on('connection', (socket) => {
       )
 
       if (Object.keys(clients).length === 1) {
-         objects = []
+         largeScenery = []
+         smallScenery = []
       }
 
       delete clients[socket.id]

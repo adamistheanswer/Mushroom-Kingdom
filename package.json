@@ -1,40 +1,41 @@
 {
-    "type": "module",
-    "scripts": {
-        "build": "vite build",
-        "dev": "nodemon -r dotenv/config server.js",
-        "start": "node server.js",
-        "format": "prettier --write \"src/*.{js,jsx,json,md,ts,tsx,css}\""
-    },
-    "dependencies": {
-        "@vitejs/plugin-react": "^2.1.0",
-        "express": "^4.17.3",
-        "express-promise-router": "^4.1.1",
-        "nipplejs": "^0.9.1",
-        "prettier": "^2.7.1",
-        "react-responsive": "^9.0.0-beta.10",
-        "simplex-noise": "^4.0.0",
-        "socket.io": "^4.5.2",
-        "socket.io-msgpack-parser": "^3.0.1",
-        "vite": "3.1.0"
-    },
-    "devDependencies": {
-        "@react-three/drei": "^9.29.1",
-        "@react-three/fiber": "^8.7.2",
-        "@types/three": "^0.144.0",
-        "dotenv": "^16.0.2",
-        "nodemon": "^2.0.15",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
-        "socket.io-client": "^4.5.2",
-        "three": "^0.143.0",
-        "vite-plugin-static-copy": "^0.9.0"
-    },
-    "engines": {
-        "node": "16.17.0"
-    },
-    "optionalDependencies": {
-        "bufferutil": "^4.0.6",
-        "utf-8-validate": "^5.0.9"
-    }
+   "type": "module",
+   "scripts": {
+      "build": "vite build",
+      "dev": "nodemon -r dotenv/config server.js",
+      "start": "node server.js",
+      "format": "prettier --write \"src/*.{js,jsx,json,md,ts,tsx,css}\""
+   },
+   "dependencies": {
+      "express": "^4.17.3",
+      "express-promise-router": "^4.1.1",
+      "nipplejs": "^0.9.1",
+      "react-responsive": "^9.0.0-beta.10",
+      "simplex-noise": "^4.0.0",
+      "socket.io": "^4.5.2",
+      "socket.io-msgpack-parser": "^3.0.1",
+      "vite": "3.1.0"
+   },
+   "devDependencies": {
+      "@react-three/drei": "^9.29.1",
+      "@react-three/fiber": "^8.7.2",
+      "@types/three": "^0.144.0",
+      "@vitejs/plugin-react": "^2.1.0",
+      "dotenv": "^16.0.2",
+      "nodemon": "^2.0.15",
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0",
+      "socket.io-client": "^4.5.2",
+      "three": "^0.143.0",
+      "styled-components": "^5.3.5",
+      "vite-plugin-babel-macros": "^1.0.6",
+      "prettier": "^2.7.1"
+   },
+   "engines": {
+      "node": "16.17.0"
+   },
+   "optionalDependencies": {
+      "bufferutil": "^4.0.6",
+      "utf-8-validate": "^5.0.9"
+   }
 }
