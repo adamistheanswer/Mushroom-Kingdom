@@ -7,6 +7,7 @@ import { useMediaQuery } from 'react-responsive'
 import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
 import { Avatar } from './Avatar'
+import { AvatarWalking } from './AvatarWalking'
 
 extend({
    BoxGeometry,
@@ -84,6 +85,8 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const meshRef = useRef<Mesh | Group>(null)
    const velocity = 1
 
+   const animationState = useRef('idle')
+
    const lastHeading = useRef(0)
    const lastPosition = useRef([0, 0, 0])
 
@@ -99,21 +102,25 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          case 'ArrowUp':
          case 'KeyW':
             handleMove({}, { vector: { y: 1 } })
+            animationState.current = 'walking'
             break
 
          case 'ArrowLeft':
          case 'KeyA':
             handleMove({}, { vector: { x: -1 } })
+            animationState.current = 'walking'
             break
 
          case 'ArrowDown':
          case 'KeyS':
             handleMove({}, { vector: { y: -1 } })
+            animationState.current = 'walking'
             break
 
          case 'ArrowRight':
          case 'KeyD':
             handleMove({}, { vector: { x: 1 } })
+            animationState.current = 'walking'
             break
          default:
             break
@@ -125,21 +132,25 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          case 'ArrowUp':
          case 'KeyW':
             fwdValue = 0
+            animationState.current = 'idle'
             break
 
          case 'ArrowLeft':
          case 'KeyA':
             lftValue = 0
+            animationState.current = 'idle'
             break
 
          case 'ArrowDown':
          case 'KeyS':
             bkdValue = 0
+            animationState.current = 'idle'
             break
 
          case 'ArrowRight':
          case 'KeyD':
             rgtValue = 0
+            animationState.current = 'idle'
             break
          default:
             break
@@ -204,7 +215,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
          let meshPositionArr = mesh.position.toArray()
          meshPositionArr[0] = Number(meshPositionArr[0].toFixed(2))
-         meshPositionArr[1] = 5
+         meshPositionArr[1] = 0
          meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
 
          if (
@@ -263,7 +274,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             >
                {clientSocket.id}
             </Text>
-            <Avatar />
+            <Avatar rotation={[0, Math.PI, 0]} />
          </group>
       </>
    )

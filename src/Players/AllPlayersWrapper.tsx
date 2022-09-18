@@ -1,13 +1,16 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { extend, useThree } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
 import { Avatar } from './Avatar'
+
 import {
    AmbientLight,
    SpotLight,
    PointLight,
    GridHelper,
    BoxGeometry,
+   Material,
+   Mesh,
 } from 'three'
 
 extend({
@@ -15,10 +18,9 @@ extend({
    SpotLight,
    PointLight,
    GridHelper,
-})
-
-extend({
+   Material,
    BoxGeometry,
+   Mesh,
 })
 
 const AllPlayersWrapper = ({ clientSocket }) => {
@@ -37,7 +39,6 @@ const AllPlayersWrapper = ({ clientSocket }) => {
       .filter((clientKey) => clientKey !== clientSocket.id)
       .map((client) => {
          const { p, r } = clients[client]
-
          return (
             <>
                <Text
@@ -54,12 +55,14 @@ const AllPlayersWrapper = ({ clientSocket }) => {
                >
                   {client}
                </Text>
-               <Avatar rotation={[0, r, 0]} position={[p[0], 1.1, p[2]]} />
+               <Avatar
+                  rotation={[0, r, 0]}
+                  name={'walking'}
+                  position={[p[0], 0, p[2]]}
+               />
             </>
          )
       })
-
-   // console.log(allPlayerModels)
 
    return <>{allPlayerModels.flat()}</>
 }

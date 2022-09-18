@@ -27,14 +27,14 @@ function useSkinnedMeshClone(path) {
 type ActionName = 'Armature|mixamo.com|Layer0'
 type GLTFActions = Record<ActionName, THREE.AnimationAction>
 
-export function Avatar(props: JSX.IntrinsicElements['group']) {
+export function AvatarWalking(props: JSX.IntrinsicElements['group']) {
    const group = useRef<Group>(null!)
    // const { nodes, materials, animations } = useGLTF(
    //    '../Models/Player/test.gltf'
    // ) as GLTFResult
 
    const { materials, animations, nodes } = useSkinnedMeshClone(
-      '../Models/Player/idle.gltf'
+      '../Models/Player/walking.gltf'
    )
    const { actions } = useAnimations<AnimationClip>(animations, group)
 
@@ -61,4 +61,4 @@ export function Avatar(props: JSX.IntrinsicElements['group']) {
    )
 }
 
-useGLTF.preload('../Models/Player/idle.gltf')
+useGLTF.preload('../Models/Player/walking.gltf')
