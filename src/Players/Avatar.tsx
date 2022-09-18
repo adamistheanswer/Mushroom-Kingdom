@@ -34,7 +34,7 @@ export function Avatar(props: JSX.IntrinsicElements['group']) {
    // ) as GLTFResult
 
    const { materials, animations, nodes } = useSkinnedMeshClone(
-      '../Models/Player/idle.gltf'
+      '../Models/Player/walking.gltf'
    )
    const { actions } = useAnimations<AnimationClip>(animations, group)
 
@@ -61,4 +61,4 @@ export function Avatar(props: JSX.IntrinsicElements['group']) {
    )
 }
 
-useGLTF.preload('../Models/Player/idle.gltf')
+useGLTF.preload('../Models/Player/walking.gltf')

@@ -56,7 +56,7 @@ const AllPlayersWrapper = ({ clientSocket }) => {
                   {client}
                </Text>
                <Avatar
-                  rotation={[0, r, 0]}
+                  rotation={[0, r + Math.PI, 0]}
                   name={'walking'}
                   position={[p[0], 0, p[2]]}
                />
