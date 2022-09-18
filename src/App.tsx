@@ -1,38 +1,51 @@
-import React, { useState, useEffect, Suspense, useRef } from 'react'
+import React, { useEffect, Suspense, useRef, useMemo } from 'react'
 import { Canvas, extend } from '@react-three/fiber'
 import { Stats } from '@react-three/drei'
-import { io, Socket } from 'socket.io-client'
+import { io } from 'socket.io-client'
 import parser from 'socket.io-msgpack-parser'
 import Lighting from './Environment/Lighting'
 import Ground from './Environment/Ground'
 import Forest from './Environment/Forest'
 import Loader from './Components/Loader'
 import AllPlayersWrapper from './Players/AllPlayersWrapper'
+import LocalPlayerWrapper from './Players/LocalPlayerWrapper'
 
-import { Color, Fog } from 'three'
-extend({ Color, Fog })
+import { Color, Fog, BoxGeometry, Material, Mesh } from 'three'
+extend({ Color, Fog, BoxGeometry, Material, Mesh })
+
+const clientSocket = io({ parser })
 
 const App: React.FC = () => {
-   const [clientSocket, setSocketClient] = useState<Socket | null>(null)
    const largeScenery = useRef([])
    const smallScenery = useRef([])
-
-   useEffect(() => {
-      setSocketClient(io({ parser }))
-
-      return () => {
-         if (clientSocket) clientSocket.disconnect()
-      }
-   }, [])
+   // const remoteColliders = useRef<any>([])
+   // const boxGemo = useMemo(() => new BoxGeometry(20, 20, 20), [])
 
    useEffect(() => {
       if (clientSocket) {
          clientSocket.on('largeScenery', (objects) => {
             largeScenery.current = objects
          })
+
          clientSocket.on('smallScenery', (objects) => {
             smallScenery.current = objects
          })
+
+         // clientSocket.on('clientUpdates', (clients) => {
+         //    let cols: Mesh<BoxGeometry, Material | Material[]>[] = []
+         //    Object.keys(clients)
+         //       .filter((clientKey) => clientKey !== clientSocket.id)
+         //       .map((client) => {
+         //          const { p, r } = clients[client]
+
+         //          let hitBox = new Mesh(boxGemo)
+         //          hitBox.position.set(p[0], p[1], p[2])
+         //          hitBox.rotation.set(0, r, 0, 'XYZ')
+         //          hitBox.updateMatrixWorld()
+         //          cols.push(hitBox)
+         //       })
+         //    remoteColliders.current = cols
+         // })
       }
    }, [clientSocket])
 
@@ -46,6 +59,7 @@ const App: React.FC = () => {
                <Lighting />
                <Suspense fallback={<Loader />}>
                   <AllPlayersWrapper clientSocket={clientSocket} />
+                  <LocalPlayerWrapper clientSocket={clientSocket} />
                   <Ground />
                   <Forest
                      largeScenery={largeScenery}

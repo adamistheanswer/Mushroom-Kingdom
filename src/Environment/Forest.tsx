@@ -22,7 +22,7 @@ const Forest = ({ largeScenery, smallScenery }) => {
    }
 
    largeObjects.forEach((_, i) => {
-      let scale = 0.35
+      let scale = 0.5
       let entity = largeObjects[i]
       const idx = entity[0]
       const pos = new Vector3(entity[1], 0, entity[2])
@@ -118,7 +118,7 @@ const Forest = ({ largeScenery, smallScenery }) => {
          />
       )
 
-      objectsLRG.push(model)
+      objectsSML.push(model)
    })
 
    return (

@@ -2,10 +2,12 @@ import React, { useRef, useCallback, useEffect, useMemo } from 'react'
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
 import { useFrame, extend } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { Mesh, Vector3, Euler, Raycaster } from 'three'
+import { Mesh, Vector3, Euler, Group } from 'three'
 import { useMediaQuery } from 'react-responsive'
 import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
+import { Avatar } from './Avatar'
+import { AvatarWalking } from './AvatarWalking'
 
 extend({
    BoxGeometry,
@@ -77,19 +79,19 @@ const handleMove = (_: {}, data: any) => {
    }
 }
 
-const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
+const LocalPlayerWrapper = ({ clientSocket }) => {
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
-   const meshRef = useRef<Mesh>(null)
+   const meshRef = useRef<Mesh | Group>(null)
    const velocity = 1
+
+   const animationState = useRef('idle')
 
    const lastHeading = useRef(0)
    const lastPosition = useRef([0, 0, 0])
 
    const tempVector = useMemo(() => new Vector3(), [])
    const upVector = useMemo(() => new Vector3(0, 1, 0), [])
-   const boxGemo = useMemo(() => new BoxGeometry(10, 10, 10), [])
-   const boxMat = useMemo(() => new MeshNormalMaterial(), [])
 
    const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
 
@@ -100,21 +102,25 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
          case 'ArrowUp':
          case 'KeyW':
             handleMove({}, { vector: { y: 1 } })
+            animationState.current = 'walking'
             break
 
          case 'ArrowLeft':
          case 'KeyA':
             handleMove({}, { vector: { x: -1 } })
+            animationState.current = 'walking'
             break
 
          case 'ArrowDown':
          case 'KeyS':
             handleMove({}, { vector: { y: -1 } })
+            animationState.current = 'walking'
             break
 
          case 'ArrowRight':
          case 'KeyD':
             handleMove({}, { vector: { x: 1 } })
+            animationState.current = 'walking'
             break
          default:
             break
@@ -126,21 +132,25 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
          case 'ArrowUp':
          case 'KeyW':
             fwdValue = 0
+            animationState.current = 'idle'
             break
 
          case 'ArrowLeft':
          case 'KeyA':
             lftValue = 0
+            animationState.current = 'idle'
             break
 
          case 'ArrowDown':
          case 'KeyS':
             bkdValue = 0
+            animationState.current = 'idle'
             break
 
          case 'ArrowRight':
          case 'KeyD':
             rgtValue = 0
+            animationState.current = 'idle'
             break
          default:
             break
@@ -171,36 +181,11 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
          return true
       }
 
-      function checkPlayerBlocked(tempVector) {
-         let blocked = false
-
-         const intersects = new Raycaster(
-            mesh?.position.clone(),
-            tempVector
-         ).intersectObjects(remoteColliders.current)
-
-         let distances = intersects.map((player) => player.distance)
-
-         distances.forEach((distance) => {
-            if (distance < 1) {
-               blocked = true
-            }
-         })
-
-         if (blocked) {
-            return true
-         }
-      }
-
       if (mesh && controls && camera) {
          const heading = Number(controls.getAzimuthalAngle().toFixed(2))
 
          if (fwdValue > 0) {
             tempVector.set(0, 0, -fwdValue).applyAxisAngle(upVector, heading)
-
-            if (checkPlayerBlocked(tempVector)) {
-               return
-            }
 
             mesh.position.addScaledVector(tempVector, velocity)
          }
@@ -208,27 +193,18 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
          if (bkdValue > 0) {
             tempVector.set(0, 0, bkdValue).applyAxisAngle(upVector, heading)
 
-            if (checkPlayerBlocked(tempVector)) {
-               return
-            }
-
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
          if (lftValue > 0) {
             tempVector.set(-lftValue, 0, 0).applyAxisAngle(upVector, heading)
 
-            if (checkPlayerBlocked(tempVector)) {
-               return
-            }
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
          if (rgtValue > 0) {
             tempVector.set(rgtValue, 0, 0).applyAxisAngle(upVector, heading)
-            if (checkPlayerBlocked(tempVector)) {
-               return
-            }
+
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
@@ -239,7 +215,7 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
 
          let meshPositionArr = mesh.position.toArray()
          meshPositionArr[0] = Number(meshPositionArr[0].toFixed(2))
-         meshPositionArr[1] = 5
+         meshPositionArr[1] = 0
          meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
 
          if (
@@ -271,7 +247,7 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
    return (
       <>
          <PerspectiveCamera
-            position={[25, 10, 25]}
+            position={[25, 20, 40]}
             fov={70}
             ref={camRef}
             makeDefault
@@ -283,19 +259,14 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             enablePan={false}
             rotateSpeed={0.4}
             target={[0, 0, 0]}
+            maxPolarAngle={Math.PI / 2 - 0.1}
             ref={orbitRef}
          />
-         <mesh
-            ref={meshRef}
-            position={[0, 5, 0]}
-            geometry={boxGemo}
-            material={boxMat}
-            castShadow
-            receiveShadow
-         >
+
+         <group ref={meshRef}>
             <Text
                rotation={[0, 0, 0]}
-               position={[0, 7, 0]}
+               position={[0, 13, 0]}
                fontSize={1}
                color="yellow"
                anchorX="center"
@@ -303,7 +274,8 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             >
                {clientSocket.id}
             </Text>
-         </mesh>
+            <Avatar rotation={[0, Math.PI, 0]} />
+         </group>
       </>
    )
 }
