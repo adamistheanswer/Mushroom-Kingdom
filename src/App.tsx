@@ -42,7 +42,7 @@ const App: React.FC = () => {
             <Canvas shadows>
                <Stats />
                <color attach="background" args={['#444444']} />
-               <fog attach="fog" color="#444444" near={50} far={300} />
+               {/* <fog attach="fog" color="#444444" near={50} far={300} /> */}
                <Lighting />
                <Suspense fallback={<Loader />}>
                   <AllPlayersWrapper clientSocket={clientSocket} />

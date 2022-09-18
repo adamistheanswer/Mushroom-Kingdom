@@ -4,15 +4,14 @@ import {
    PerspectiveCamera,
    Text,
    useFBX,
-   useTexture,
 } from '@react-three/drei'
 import { useFrame, extend } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { Mesh, Vector3, Euler, Raycaster, Group, TextureLoader } from 'three'
+import { Mesh, Vector3, Euler, Raycaster, Group } from 'three'
 import { useMediaQuery } from 'react-responsive'
 import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
-import Player from './Player'
+import Mushy from './Mushy'
 
 extend({
    BoxGeometry,
@@ -277,22 +276,38 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
       updatePlayer()
    })
 
-   let model = useFBX('../Models/Player/Mushy.fbx')
-   model.scale.setScalar(0.015)
-   model.traverse((child: any) => {
-      if (child.isSkinnedMesh) {
-         const texture = useTexture('../Models/Player/mushySkin.png')
-         child.material[1].map = texture
-         child.material.needsupdate = true
-         child.castShadow = true
-         child.receiveShadow = true
-      }
-   })
+   // function FBXHandler(url, scale) {
+   //    let model = useFBX(url)
+   //    model.scale.setScalar(scale)
+
+   //    return model
+   // }
+
+   // const fbxModel = useFBX('../Models/Player/Mushy.fbx')
+   // const modelTexture = useTexture('../Models/Player/mushySkin.png')
+
+   // fbxModel.scale.setScalar(0.015)
+   // fbxModel.traverse((child: any) => {
+   //    if (child.isSkinnedMesh) {
+   //       const texture = modelTexture
+   //       child.material[1].map = texture
+   //       child.material.needsupdate = true
+   //       child.castShadow = true
+   //       child.receiveShadow = true
+   //    }
+   // })
+
+   // const model = useFBX('../Models/Player/MushyOld.fbx')
+   // model.scale.setScalar(0.015)
+   // model.traverse((f: { castShadow: boolean; receiveShadow: boolean }) => {
+   //    f.castShadow = true
+   //    f.receiveShadow = true
+   // })
 
    return (
       <>
          <PerspectiveCamera
-            position={[25, 10, 25]}
+            position={[25, 100, 25]}
             fov={70}
             ref={camRef}
             makeDefault
@@ -304,7 +319,6 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             enablePan={false}
             rotateSpeed={0.4}
             target={[0, 0, 0]}
-            // minPolarAngle={Math.PI / 2}
             maxPolarAngle={Math.PI / 2 - 0.1}
             ref={orbitRef}
          />
@@ -319,7 +333,12 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             >
                {clientSocket.id}
             </Text>
-            <primitive position={[0, 1.2, 0]} object={model} ref={meshRef} />
+            {/* <Mushy id={clientSocket.id} rot={[0, 1.2, 0]} pos={[0, 1.2, 0]} /> */}
+            {/* <primitive
+               position={[0, 1.2, 0]}
+               object={FBXHandler('../Models/Player/MushyEmSkin.fbx', 0.015)}
+               // object={model}
+            /> */}
          </group>
       </>
    )
