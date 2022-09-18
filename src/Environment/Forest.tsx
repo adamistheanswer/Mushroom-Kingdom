@@ -33,7 +33,7 @@ const Forest = ({ largeScenery, smallScenery }) => {
             position={pos}
             object={
                idx === 1
-                  ? FBXHandler('../Models/Player/BirchTree_1.fbx', scale)
+                  ? FBXHandler('../Models/Forest/BirchTree_1.fbx', scale)
                   : idx === 2
                   ? FBXHandler('../Models/Forest/BirchTree_2.fbx', scale)
                   : idx === 3
@@ -118,7 +118,7 @@ const Forest = ({ largeScenery, smallScenery }) => {
          />
       )
 
-      objectsLRG.push(model)
+      objectsSML.push(model)
    })
 
    return (

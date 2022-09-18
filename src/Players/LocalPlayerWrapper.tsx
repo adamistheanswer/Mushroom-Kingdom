@@ -1,17 +1,12 @@
 import React, { useRef, useCallback, useEffect, useMemo } from 'react'
-import {
-   OrbitControls,
-   PerspectiveCamera,
-   Text,
-   useFBX,
-} from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
 import { useFrame, extend } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { Mesh, Vector3, Euler, Raycaster, Group } from 'three'
+import { Mesh, Vector3, Euler, Group } from 'three'
 import { useMediaQuery } from 'react-responsive'
 import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
-import Mushy from './Mushy'
+import { Avatar } from './Avatar'
 
 extend({
    BoxGeometry,
@@ -83,7 +78,7 @@ const handleMove = (_: {}, data: any) => {
    }
 }
 
-const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
+const LocalPlayerWrapper = ({ clientSocket }) => {
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
    const meshRef = useRef<Mesh | Group>(null)
@@ -94,10 +89,6 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
 
    const tempVector = useMemo(() => new Vector3(), [])
    const upVector = useMemo(() => new Vector3(0, 1, 0), [])
-   // const boxGemo = useMemo(() => new BoxGeometry(10, 10, 10), [])
-   // const boxMat = useMemo(() => new MeshNormalMaterial(), [])
-
-   // console.log('hit')
 
    const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
 
@@ -179,36 +170,11 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
          return true
       }
 
-      function checkPlayerBlocked(tempVector) {
-         let blocked = false
-
-         const intersects = new Raycaster(
-            mesh?.position.clone(),
-            tempVector
-         ).intersectObjects(remoteColliders.current)
-
-         let distances = intersects.map((player) => player.distance)
-
-         distances.forEach((distance) => {
-            if (distance < 1) {
-               blocked = true
-            }
-         })
-
-         if (blocked) {
-            return true
-         }
-      }
-
       if (mesh && controls && camera) {
          const heading = Number(controls.getAzimuthalAngle().toFixed(2))
 
          if (fwdValue > 0) {
             tempVector.set(0, 0, -fwdValue).applyAxisAngle(upVector, heading)
-
-            if (checkPlayerBlocked(tempVector)) {
-               return
-            }
 
             mesh.position.addScaledVector(tempVector, velocity)
          }
@@ -216,27 +182,18 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
          if (bkdValue > 0) {
             tempVector.set(0, 0, bkdValue).applyAxisAngle(upVector, heading)
 
-            if (checkPlayerBlocked(tempVector)) {
-               return
-            }
-
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
          if (lftValue > 0) {
             tempVector.set(-lftValue, 0, 0).applyAxisAngle(upVector, heading)
 
-            if (checkPlayerBlocked(tempVector)) {
-               return
-            }
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
          if (rgtValue > 0) {
             tempVector.set(rgtValue, 0, 0).applyAxisAngle(upVector, heading)
-            if (checkPlayerBlocked(tempVector)) {
-               return
-            }
+
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
@@ -276,38 +233,10 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
       updatePlayer()
    })
 
-   // function FBXHandler(url, scale) {
-   //    let model = useFBX(url)
-   //    model.scale.setScalar(scale)
-
-   //    return model
-   // }
-
-   // const fbxModel = useFBX('../Models/Player/Mushy.fbx')
-   // const modelTexture = useTexture('../Models/Player/mushySkin.png')
-
-   // fbxModel.scale.setScalar(0.015)
-   // fbxModel.traverse((child: any) => {
-   //    if (child.isSkinnedMesh) {
-   //       const texture = modelTexture
-   //       child.material[1].map = texture
-   //       child.material.needsupdate = true
-   //       child.castShadow = true
-   //       child.receiveShadow = true
-   //    }
-   // })
-
-   // const model = useFBX('../Models/Player/MushyOld.fbx')
-   // model.scale.setScalar(0.015)
-   // model.traverse((f: { castShadow: boolean; receiveShadow: boolean }) => {
-   //    f.castShadow = true
-   //    f.receiveShadow = true
-   // })
-
    return (
       <>
          <PerspectiveCamera
-            position={[25, 100, 25]}
+            position={[25, 20, 40]}
             fov={70}
             ref={camRef}
             makeDefault
@@ -322,6 +251,7 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             maxPolarAngle={Math.PI / 2 - 0.1}
             ref={orbitRef}
          />
+
          <group ref={meshRef}>
             <Text
                rotation={[0, 0, 0]}
@@ -333,12 +263,7 @@ const LocalPlayerWrapper = ({ clientSocket, remoteColliders }) => {
             >
                {clientSocket.id}
             </Text>
-            {/* <Mushy id={clientSocket.id} rot={[0, 1.2, 0]} pos={[0, 1.2, 0]} /> */}
-            {/* <primitive
-               position={[0, 1.2, 0]}
-               object={FBXHandler('../Models/Player/MushyEmSkin.fbx', 0.015)}
-               // object={model}
-            /> */}
+            <Avatar />
          </group>
       </>
    )

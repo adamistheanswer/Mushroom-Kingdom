@@ -1,18 +1,14 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { extend } from '@react-three/fiber'
-import LocalPlayerWrapper from './LocalPlayerWrapper'
-import { Socket } from 'socket.io'
-
+import { extend, useThree } from '@react-three/fiber'
+import { Text } from '@react-three/drei'
+import { Avatar } from './Avatar'
 import {
    AmbientLight,
    SpotLight,
    PointLight,
    GridHelper,
-   Mesh,
    BoxGeometry,
-   Material,
 } from 'three'
-import RemotePlayers from './RemotePlayers'
 
 extend({
    AmbientLight,
@@ -27,9 +23,8 @@ extend({
 
 const AllPlayersWrapper = ({ clientSocket }) => {
    const [clients, setClients] = useState({})
-   const remoteColliders = useRef<any>([])
-   const boxGemo = useMemo(() => new BoxGeometry(20, 20, 20), [])
 
+   const { camera } = useThree()
    useEffect(() => {
       if (clientSocket) {
          clientSocket.on('clientUpdates', (updatedClients) => {
@@ -38,33 +33,35 @@ const AllPlayersWrapper = ({ clientSocket }) => {
       }
    }, [clientSocket])
 
-   useEffect(() => {
-      if (clientSocket) {
-         let cols: Mesh<BoxGeometry, Material | Material[]>[] = []
-         Object.keys(clients)
-            .filter((clientKey) => clientKey !== clientSocket.id)
-            .map((client) => {
-               const { p, r } = clients[client]
+   const allPlayerModels = Object.keys(clients)
+      .filter((clientKey) => clientKey !== clientSocket.id)
+      .map((client) => {
+         const { p, r } = clients[client]
 
-               let player = new Mesh(boxGemo)
-               player.position.set(p[0], p[1], p[2])
-               player.rotation.set(0, r, 0, 'XYZ')
-               player.updateMatrixWorld()
-               cols.push(player)
-            })
-         remoteColliders.current = cols
-      }
-   }, [clients])
+         return (
+            <>
+               <Text
+                  rotation={[
+                     camera.rotation.x,
+                     camera.rotation.y,
+                     camera.rotation.z,
+                  ]}
+                  position={[p[0], 13, p[2]]}
+                  fontSize={1}
+                  color="aqua"
+                  anchorX="center"
+                  anchorY="middle"
+               >
+                  {client}
+               </Text>
+               <Avatar rotation={[0, r, 0]} position={[p[0], 1.1, p[2]]} />
+            </>
+         )
+      })
 
-   return (
-      <>
-         <LocalPlayerWrapper
-            clientSocket={clientSocket}
-            remoteColliders={remoteColliders}
-         />
-         <RemotePlayers clientSocket={clientSocket} clients={clients} />
-      </>
-   )
+   // console.log(allPlayerModels)
+
+   return <>{allPlayerModels.flat()}</>
 }
 
 export default AllPlayersWrapper
