@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { extend, useThree } from '@react-three/fiber'
 import { Text } from '@react-three/drei'
 import { Avatar } from './Avatar'
-
+import { AvatarAnimated } from './AvatarAnimated'
 import {
    AmbientLight,
    SpotLight,
@@ -55,11 +55,15 @@ const AllPlayersWrapper = ({ clientSocket }) => {
                >
                   {client}
                </Text>
-               <Avatar
+               <AvatarAnimated
+                  position={[p[0], 0, p[2]]}
+                  rotation={[0, Math.PI, 0]}
+               />
+               {/* <Avatar
                   rotation={[0, r + Math.PI, 0]}
                   name={'walking'}
                   position={[p[0], 0, p[2]]}
-               />
+               /> */}
             </>
          )
       })
