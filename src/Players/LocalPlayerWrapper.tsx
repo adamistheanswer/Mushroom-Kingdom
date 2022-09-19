@@ -8,6 +8,7 @@ import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
 import { Avatar } from './Avatar'
 import { AvatarWalking } from './AvatarWalking'
+import { AvatarAnimated } from './AvatarAnimated'
 
 extend({
    BoxGeometry,
@@ -274,7 +275,8 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             >
                {clientSocket.id}
             </Text>
-            <Avatar rotation={[0, Math.PI, 0]} />
+            <AvatarAnimated rotation={[0, Math.PI, 0]} />
+            {/* <Avatar rotation={[0, Math.PI, 0]} /> */}
          </group>
       </>
    )
