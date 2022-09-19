@@ -82,7 +82,7 @@ export function AvatarAnimated(props: JSX.IntrinsicElements['group']) {
                   skeleton={nodes.Circle001.skeleton}
                />
             </group>
-            <group name="cs_grp">
+            {/* <group name="cs_grp">
                <group name="cs_arm_fk" position={[1.5, 8.5, 0]} scale={0.82} />
                <group name="cs_calf_fk" position={[0.5, 8.5, 0]} scale={0.82} />
                <group name="cs_circle" position={[0.5, 4.5, 0]} scale={0.21} />
@@ -166,7 +166,7 @@ export function AvatarAnimated(props: JSX.IntrinsicElements['group']) {
                   scale={0.82}
                />
                <group name="cs_toe" position={[0.5, 9.5, 0]} scale={0.43} />
-            </group>
+            </group> */}
          </group>
       </group>
    )
