@@ -46,21 +46,26 @@ function useSkinnedMeshClone(path) {
    return { scene: clonedScene, materials, animations, nodes }
 }
 
-export function AvatarAnimated(props: JSX.IntrinsicElements['group']) {
+export function AvatarAnimated({ rotation, position, action }) {
    const group = useRef<THREE.Group>(null!)
+   const previousAction = usePrevious(action)
+   const { materials, animations, nodes } = useSkinnedMeshClone('../Models/Player/FullMushy.gltf')
 
-   const { materials, animations, nodes } = useSkinnedMeshClone(
-      '../Models/Player/FullMushy.gltf'
-   )
+   // console.log(action)
 
-   const { actions } = useAnimations<GLTFActions>(animations, group)
+   const { actions, names } = useAnimations<GLTFActions>(animations, group)
 
    useEffect(() => {
-      actions['Excited']!.play()
-   })
+      if (previousAction) {
+         actions[previousAction].fadeOut(0.2)
+         actions[action].stop()
+      }
+      actions[action].play()
+      actions[action].fadeIn(0.2)
+   }, [actions, action, previousAction])
 
    return (
-      <group ref={group} {...props} dispose={null}>
+      <group ref={group} rotation={rotation} position={position} dispose={null}>
          <group name="Scene" scale={1.6}>
             <group name="Mushy">
                <primitive object={nodes.mixamorigHips} />
@@ -82,94 +87,19 @@ export function AvatarAnimated(props: JSX.IntrinsicElements['group']) {
                   skeleton={nodes.Circle001.skeleton}
                />
             </group>
-            {/* <group name="cs_grp">
-               <group name="cs_arm_fk" position={[1.5, 8.5, 0]} scale={0.82} />
-               <group name="cs_calf_fk" position={[0.5, 8.5, 0]} scale={0.82} />
-               <group name="cs_circle" position={[0.5, 4.5, 0]} scale={0.21} />
-               <group
-                  name="cs_foot"
-                  position={[0.5, 10.5, 0]}
-                  rotation={[-Math.PI, 0, 0]}
-                  scale={0.31}
-               />
-               <group
-                  name="cs_foot001"
-                  position={[0.5, 10.5, 0]}
-                  rotation={[-Math.PI, 0, 0]}
-                  scale={0.31}
-               />
-               <group
-                  name="cs_foot002"
-                  position={[0.5, 10.5, 0]}
-                  rotation={[-Math.PI, 0, 0]}
-                  scale={0.31}
-               />
-               <group
-                  name="cs_foot_01"
-                  position={[0.5, 18.5, 0]}
-                  rotation={[0, Math.PI / 2, 0]}
-                  scale={2.19}
-               />
-               <group
-                  name="cs_foot_roll"
-                  position={[0.5, 12.5, 0]}
-                  scale={0.59}
-               />
-               <group
-                  name="cs_forearm_fk"
-                  position={[2.5, 8.5, 0]}
-                  scale={0.82}
-               />
-               <group
-                  name="cs_hand"
-                  position={[0.5, 19.5, 0]}
-                  rotation={[-Math.PI, 0, 0]}
-                  scale={0.31}
-               />
-               <group name="cs_head" position={[0.5, 13.5, 0]} scale={0.21} />
-               <group name="cs_hips" position={[0.5, 11.5, 0]} scale={0.21} />
-               <group name="cs_master" position={[0.5, 17.5, 0]} scale={0.1} />
-               <group name="cs_neck" position={[0.5, 14.5, 0]} scale={0.21} />
-               <group
-                  name="cs_shoulder_left"
-                  position={[0.5, 15.5, 0]}
-                  rotation={[-Math.PI, -Math.PI / 2, 0]}
-                  scale={1.04}
-               />
-               <group
-                  name="cs_shoulder_right"
-                  position={[0.5, 16.5, 0]}
-                  rotation={[-Math.PI, -Math.PI / 2, 0]}
-                  scale={1.04}
-               />
-               <group name="cs_sphere" position={[0.5, 2.5, 0]} scale={0.21} />
-               <group
-                  name="cs_sphere_012"
-                  position={[3.5, 2.5, 0]}
-                  scale={0.21}
-               />
-               <group
-                  name="cs_square"
-                  position={[1.5, 1.5, 0]}
-                  rotation={[-Math.PI, 0, 0]}
-                  scale={0.15}
-               />
-               <group
-                  name="cs_square_2"
-                  position={[0.5, 1.5, 0]}
-                  rotation={[-Math.PI, 0, 0]}
-                  scale={0.15}
-               />
-               <group
-                  name="cs_thigh_fk"
-                  position={[0.5, 7.5, 0]}
-                  scale={0.82}
-               />
-               <group name="cs_toe" position={[0.5, 9.5, 0]} scale={0.43} />
-            </group> */}
          </group>
       </group>
    )
 }
 
 useGLTF.preload('../Models/Player/FullMushy.gltf')
+
+function usePrevious(value) {
+   const ref = useRef('Idle')
+
+   useEffect(() => {
+      ref.current = value
+   }, [value])
+
+   return ref.current
+}
