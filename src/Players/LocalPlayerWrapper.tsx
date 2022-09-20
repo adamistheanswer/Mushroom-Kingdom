@@ -41,8 +41,6 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
       const { forward, backward, left, right, dance1, dance2, excited, punch, salute, wave } = keyboardControls.current
       const { forwardJoy, backwardJoy, leftJoy, rightJoy } = joystickControls.current
 
-      console.log(dance1, dance2, excited, punch, salute, wave)
-
       function arrIdentical(a1, a2) {
          let i = a1.length
          if (i != a2.length) return false
