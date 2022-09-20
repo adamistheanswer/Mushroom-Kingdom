@@ -47,14 +47,12 @@ let largeScenery = []
 let smallScenery = []
 
 ioServer.on('connection', (socket) => {
-   console.log(
-      `User ${socket.id} connected - ${ioServer.engine.clientsCount} active users`
-   )
+   console.log(`User ${socket.id} connected - ${ioServer.engine.clientsCount} active users`)
 
    clients[socket.id] = {
       p: [0, 0, 0],
       r: 0,
-      s: 'idle',
+      s: 'Idle',
    }
 
    if (largeScenery.length === 0) {
@@ -63,11 +61,8 @@ ioServer.on('connection', (socket) => {
       for (let i = 0; i < newLargeObjects.length; i++) {
          newLargeObjects[i] = [
             Math.floor(Math.random() * 12),
-            Math.ceil(Math.random() * 475) *
-               (Math.round(Math.random()) ? 1 : -1),
-
-            Math.ceil(Math.random() * 475) *
-               (Math.round(Math.random()) ? 1 : -1),
+            Math.ceil(Math.random() * 475) * (Math.round(Math.random()) ? 1 : -1),
+            Math.ceil(Math.random() * 475) * (Math.round(Math.random()) ? 1 : -1),
          ]
       }
 
@@ -83,11 +78,8 @@ ioServer.on('connection', (socket) => {
       for (let i = 0; i < newSmallScenery.length; i++) {
          newSmallScenery[i] = [
             Math.floor(Math.random() * 22),
-            Math.ceil(Math.random() * 500) *
-               (Math.round(Math.random()) ? 1 : -1),
-
-            Math.ceil(Math.random() * 500) *
-               (Math.round(Math.random()) ? 1 : -1),
+            Math.ceil(Math.random() * 500) * (Math.round(Math.random()) ? 1 : -1),
+            Math.ceil(Math.random() * 500) * (Math.round(Math.random()) ? 1 : -1),
          ]
       }
 
@@ -99,10 +91,12 @@ ioServer.on('connection', (socket) => {
 
    ioServer.sockets.emit('clientUpdates', clients)
 
-   socket.on('move', ({ r, p }) => {
+   socket.on('move', ({ r, p, s }) => {
+      console.log(r, p, s)
       if (clients[socket.id]) {
          clients[socket.id].p = p
          clients[socket.id].r = r
+         clients[socket.id].s = s
       }
    })
 
@@ -111,9 +105,7 @@ ioServer.on('connection', (socket) => {
    }, 100)
 
    socket.on('disconnect', () => {
-      console.log(
-         `User ${socket.id} disconnected - ${ioServer.engine.clientsCount} active users`
-      )
+      console.log(`User ${socket.id} disconnected - ${ioServer.engine.clientsCount} active users`)
 
       if (Object.keys(clients).length === 1) {
          largeScenery = []

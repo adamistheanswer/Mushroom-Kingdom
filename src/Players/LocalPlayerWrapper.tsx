@@ -1,84 +1,18 @@
-import React, { useRef, useCallback, useEffect, useMemo } from 'react'
-import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
+import React, { useRef, useCallback, useMemo, useState } from 'react'
+import { OrbitControls, PerspectiveCamera, Text, Html } from '@react-three/drei'
 import { useFrame, extend } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Mesh, Vector3, Euler, Group } from 'three'
 import { useMediaQuery } from 'react-responsive'
-import nipplejs from 'nipplejs'
 import { BoxGeometry, MeshNormalMaterial } from 'three'
-import { Avatar } from './Avatar'
-import { AvatarWalking } from './AvatarWalking'
 import { AvatarAnimated } from './AvatarAnimated'
+import { useKeyboardControls } from '../Utils/useKeyboardControls'
+import { useJoystickControls } from '../Utils/useJoystickControls'
 
 extend({
    BoxGeometry,
    MeshNormalMaterial,
 })
-
-let fwdValue = 0
-let bkdValue = 0
-let rgtValue = 0
-let lftValue = 0
-
-type useJoystickProps = {
-   isTabletOrMobile: boolean
-}
-
-function useJoystick({ isTabletOrMobile }: useJoystickProps) {
-   const handleEnd = () => {
-      bkdValue = 0
-      fwdValue = 0
-      lftValue = 0
-      rgtValue = 0
-   }
-
-   let joyManager: any
-
-   useEffect(() => {
-      if (!joyManager && isTabletOrMobile) {
-         joyManager = nipplejs.create({
-            zone: document.getElementById('joystickWrapper1')!,
-            size: 120,
-            maxNumberOfNipples: 1,
-            mode: 'static',
-            restJoystick: true,
-            shape: 'circle',
-            position: { bottom: '80px', right: '80px' },
-            dynamicPage: true,
-         })
-         joyManager['0'].on('move', handleMove)
-         joyManager['0'].on('end', handleEnd)
-      }
-
-      return () => {
-         if (joyManager) {
-            joyManager['0'].off('move', handleMove)
-            joyManager['0'].off('end', handleEnd)
-         }
-      }
-   }, [isTabletOrMobile])
-}
-
-const handleMove = (_: {}, data: any) => {
-   const forward = data.vector.y
-   const turn = data.vector.x
-
-   if (forward > 0) {
-      fwdValue = Math.abs(forward)
-      bkdValue = 0
-   } else if (forward < 0) {
-      fwdValue = 0
-      bkdValue = Math.abs(forward)
-   }
-
-   if (turn > 0) {
-      lftValue = 0
-      rgtValue = Math.abs(turn)
-   } else if (turn < 0) {
-      lftValue = Math.abs(turn)
-      rgtValue = 0
-   }
-}
 
 const LocalPlayerWrapper = ({ clientSocket }) => {
    const orbitRef = useRef<OrbitControlsImpl>(null)
@@ -86,92 +20,28 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const meshRef = useRef<Mesh | Group>(null)
    const velocity = 1
 
-   const animationState = useRef('idle')
-
    const lastHeading = useRef(0)
+   const lastAction = useRef('Idle')
    const lastPosition = useRef([0, 0, 0])
 
    const tempVector = useMemo(() => new Vector3(), [])
    const upVector = useMemo(() => new Vector3(0, 1, 0), [])
 
    const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
+   const joystickControls = useJoystickControls(isTabletOrMobile)
+   const keyboardControls = useKeyboardControls()
 
-   useJoystick({ isTabletOrMobile })
-
-   const onKeyDown = (event: KeyboardEvent) => {
-      switch (event.code) {
-         case 'ArrowUp':
-         case 'KeyW':
-            handleMove({}, { vector: { y: 1 } })
-            animationState.current = 'walking'
-            break
-
-         case 'ArrowLeft':
-         case 'KeyA':
-            handleMove({}, { vector: { x: -1 } })
-            animationState.current = 'walking'
-            break
-
-         case 'ArrowDown':
-         case 'KeyS':
-            handleMove({}, { vector: { y: -1 } })
-            animationState.current = 'walking'
-            break
-
-         case 'ArrowRight':
-         case 'KeyD':
-            handleMove({}, { vector: { x: 1 } })
-            animationState.current = 'walking'
-            break
-         default:
-            break
-      }
-   }
-
-   const onKeyUp = (event: KeyboardEvent) => {
-      switch (event.code) {
-         case 'ArrowUp':
-         case 'KeyW':
-            fwdValue = 0
-            animationState.current = 'idle'
-            break
-
-         case 'ArrowLeft':
-         case 'KeyA':
-            lftValue = 0
-            animationState.current = 'idle'
-            break
-
-         case 'ArrowDown':
-         case 'KeyS':
-            bkdValue = 0
-            animationState.current = 'idle'
-            break
-
-         case 'ArrowRight':
-         case 'KeyD':
-            rgtValue = 0
-            animationState.current = 'idle'
-            break
-         default:
-            break
-      }
-   }
-
-   useEffect(() => {
-      document.addEventListener('keydown', onKeyDown)
-      document.addEventListener('keyup', onKeyUp)
-
-      return () => {
-         document.removeEventListener('keydown', onKeyDown)
-         document.removeEventListener('keyup', onKeyUp)
-      }
-   }, [])
+   const [action, setAction] = useState('Idle')
 
    const updatePlayer = useCallback(() => {
       const mesh = meshRef.current
-      const controls = orbitRef.current
+      const orbitControls = orbitRef.current
       const camera = camRef.current
+
+      const { forward, backward, left, right, dance1, dance2, excited, punch, salute, wave } = keyboardControls.current
+      const { forwardJoy, backwardJoy, leftJoy, rightJoy } = joystickControls.current
+
+      console.log(dance1, dance2, excited, punch, salute, wave)
 
       function arrIdentical(a1, a2) {
          let i = a1.length
@@ -182,64 +52,106 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          return true
       }
 
-      if (mesh && controls && camera) {
-         const heading = Number(controls.getAzimuthalAngle().toFixed(2))
+      if (mesh && orbitControls && camera) {
+         const azimuthAngle = Number(orbitControls.getAzimuthalAngle().toFixed(2))
 
-         if (fwdValue > 0) {
-            tempVector.set(0, 0, -fwdValue).applyAxisAngle(upVector, heading)
-
+         if (forward || forwardJoy !== 0) {
+            tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
+            setAction('Walking')
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
-         if (bkdValue > 0) {
-            tempVector.set(0, 0, bkdValue).applyAxisAngle(upVector, heading)
-
+         if (backward || backwardJoy !== 0) {
+            tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
+            setAction('WalkingB')
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
-         if (lftValue > 0) {
-            tempVector.set(-lftValue, 0, 0).applyAxisAngle(upVector, heading)
+         if (left || leftJoy !== 0) {
+            tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
 
+            setAction('StrafeLeft')
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
-         if (rgtValue > 0) {
-            tempVector.set(rgtValue, 0, 0).applyAxisAngle(upVector, heading)
-
+         if (right || rightJoy !== 0) {
+            tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
+            setAction('StrafeRight')
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
-         camera.position.sub(controls.target)
-         controls.target.copy(mesh.position)
+         camera.position.sub(orbitControls.target)
+         orbitControls.target.copy(mesh.position)
          camera.position.add(mesh.position)
-         mesh.setRotationFromEuler(new Euler(0, heading, 0, 'XYZ'))
+         mesh.setRotationFromEuler(new Euler(0, azimuthAngle, 0, 'XYZ'))
 
          let meshPositionArr = mesh.position.toArray()
          meshPositionArr[0] = Number(meshPositionArr[0].toFixed(2))
          meshPositionArr[1] = 0
          meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
 
-         if (
-            lastHeading.current === heading &&
-            arrIdentical(lastPosition.current, meshPositionArr)
-         ) {
-            return
+         if (dance1) {
+            setAction('Dance')
          }
 
-         if (lastHeading.current !== heading) {
-            lastHeading.current = heading
+         if (dance2) {
+            setAction('Dance2')
+         }
+
+         if (excited) {
+            setAction('Excited')
+         }
+
+         if (punch) {
+            setAction('Punch')
+         }
+
+         if (salute) {
+            setAction('Salute')
+         }
+
+         if (wave) {
+            setAction('Waving')
+         }
+
+         if (
+            lastHeading.current === azimuthAngle &&
+            arrIdentical(lastPosition.current, meshPositionArr) &&
+            !dance1 &&
+            !dance2 &&
+            !excited &&
+            !punch &&
+            !salute &&
+            !wave
+         ) {
+            setAction('Idle')
+         }
+
+         const noChange =
+            lastHeading.current === azimuthAngle &&
+            arrIdentical(lastPosition.current, meshPositionArr) &&
+            lastAction.current === action
+
+         if (lastHeading.current !== azimuthAngle) {
+            lastHeading.current = azimuthAngle
+         }
+
+         if (lastAction.current !== action) {
+            lastAction.current = action
          }
 
          if (!arrIdentical(lastPosition.current, meshPositionArr)) {
             lastPosition.current = meshPositionArr
          }
 
-         clientSocket.emit('move', {
-            r: heading,
-            p: meshPositionArr,
-         })
+         !noChange &&
+            clientSocket.emit('move', {
+               r: azimuthAngle,
+               p: meshPositionArr,
+               s: action,
+            })
       }
-   }, [meshRef, orbitRef, camRef, velocity, clientSocket])
+   }, [meshRef, orbitRef, camRef, velocity, action, clientSocket])
 
    useFrame(() => {
       updatePlayer()
@@ -247,12 +159,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    return (
       <>
-         <PerspectiveCamera
-            position={[25, 20, 40]}
-            fov={70}
-            ref={camRef}
-            makeDefault
-         />
+         <PerspectiveCamera position={[25, 20, 40]} fov={70} ref={camRef} makeDefault />
          <OrbitControls
             autoRotate={false}
             enableDamping={false}
@@ -275,8 +182,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             >
                {clientSocket.id}
             </Text>
-            <AvatarAnimated rotation={[0, Math.PI, 0]} />
-            {/* <Avatar rotation={[0, Math.PI, 0]} /> */}
+            <AvatarAnimated action={action} position={null} rotation={[0, Math.PI, 0]} />
          </group>
       </>
    )
