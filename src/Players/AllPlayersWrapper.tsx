@@ -4,7 +4,6 @@ import { Text } from '@react-three/drei'
 import { AvatarAnimated } from './AvatarAnimated'
 
 import { AmbientLight, SpotLight, PointLight, GridHelper, BoxGeometry, Material, Mesh } from 'three'
-
 extend({
    AmbientLight,
    SpotLight,
@@ -14,6 +13,28 @@ extend({
    BoxGeometry,
    Mesh,
 })
+
+let actions = [
+   'Dance',
+   'Dance2',
+   'Excited',
+   'Idle',
+   'Punch',
+   'Salute',
+   'StrafeLeft',
+   'StrafeRight',
+   'Walking',
+   'WalkingB',
+   'Waving',
+]
+
+function playerActionsIndexesToActions(indexArr) {
+   return indexArr
+      .map((index) => {
+         return actions[index]
+      })
+      .toString()
+}
 
 const AllPlayersWrapper = ({ clientSocket }) => {
    const [clients, setClients] = useState({})
@@ -43,7 +64,11 @@ const AllPlayersWrapper = ({ clientSocket }) => {
                >
                   {client}
                </Text>
-               <AvatarAnimated action={s} position={[p[0], 0, p[2]]} rotation={[0, Math.PI + r, 0]} />
+               <AvatarAnimated
+                  playerActions={playerActionsIndexesToActions(s)}
+                  position={[p[0], 0, p[2]]}
+                  rotation={[0, Math.PI + r, 0]}
+               />
             </>
          )
       })

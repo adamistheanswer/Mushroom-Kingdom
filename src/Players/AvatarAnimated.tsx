@@ -46,23 +46,32 @@ function useSkinnedMeshClone(path) {
    return { scene: clonedScene, materials, animations, nodes }
 }
 
-export function AvatarAnimated({ rotation, position, action }) {
-   const group = useRef<THREE.Group>(null!)
-   const previousAction = usePrevious(action)
-   const { materials, animations, nodes } = useSkinnedMeshClone('../Models/Player/FullMushy.gltf')
+export function AvatarAnimated({ rotation, position, playerActions }) {
+   let actionsInit
 
-   // console.log(action)
+   if (playerActions.length === 0) {
+      actionsInit = 'Idle'
+   } else {
+      actionsInit = playerActions
+   }
+
+   const group = useRef<THREE.Group>(null!)
+   const previousAction = usePrevious(actionsInit)
+   const { materials, animations, nodes } = useSkinnedMeshClone('../Models/Player/Anims/FullMushy.gltf')
 
    const { actions, names } = useAnimations<GLTFActions>(animations, group)
 
    useEffect(() => {
-      if (previousAction) {
-         actions[previousAction].fadeOut(0.2)
-         actions[action].stop()
-      }
-      actions[action].play()
-      actions[action].fadeIn(0.2)
-   }, [actions, action, previousAction])
+      let currentArr = actionsInit.split(',')
+      currentArr.forEach((action) => {
+         actions[action]?.reset().fadeIn(0.4).play()
+      })
+
+      return () =>
+         void currentArr.forEach((action) => {
+            actions[action]?.fadeOut(0.4)
+         })
+   }, [actions, actionsInit])
 
    return (
       <group ref={group} rotation={rotation} position={position} dispose={null}>
