@@ -1,6 +1,6 @@
-import React, { useEffect, Suspense, useRef, useMemo } from 'react'
+import React, { useEffect, Suspense, useRef } from 'react'
 import { Canvas, extend } from '@react-three/fiber'
-import { Stats } from '@react-three/drei'
+import { Stats, PerspectiveCamera, OrbitControls } from '@react-three/drei'
 import { io } from 'socket.io-client'
 import parser from 'socket.io-msgpack-parser'
 import Lighting from './Environment/Lighting'
@@ -11,6 +11,7 @@ import AllPlayersWrapper from './Players/AllPlayersWrapper'
 import LocalPlayerWrapper from './Players/LocalPlayerWrapper'
 
 import { Color, Fog, BoxGeometry, Material, Mesh } from 'three'
+
 extend({ Color, Fog, BoxGeometry, Material, Mesh })
 
 const clientSocket = io({ parser })
@@ -53,6 +54,17 @@ const App: React.FC = () => {
       clientSocket && (
          <div style={{ width: '100%', height: '100vh' }}>
             <Canvas shadows>
+               <PerspectiveCamera position={[25, 20, 40]} fov={70} makeDefault />
+               <OrbitControls
+                  autoRotate={false}
+                  enableDamping={false}
+                  enableZoom={false}
+                  enablePan={false}
+                  rotateSpeed={0.4}
+                  target={[0, 0, 0]}
+                  maxPolarAngle={Math.PI / 2 - 0.1}
+                  makeDefault
+               />
                <Stats />
                <color attach="background" args={['#444444']} />
                <fog attach="fog" color="#444444" near={50} far={300} />
@@ -61,10 +73,7 @@ const App: React.FC = () => {
                   <AllPlayersWrapper clientSocket={clientSocket} />
                   <LocalPlayerWrapper clientSocket={clientSocket} />
                   <Ground />
-                  <Forest
-                     largeScenery={largeScenery}
-                     smallScenery={smallScenery}
-                  />
+                  <Forest largeScenery={largeScenery} smallScenery={smallScenery} />
                </Suspense>
             </Canvas>
          </div>
