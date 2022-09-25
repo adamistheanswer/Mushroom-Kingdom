@@ -7,6 +7,8 @@
       "format": "prettier --write \"src/*.{js,jsx,json,md,ts,tsx,css}\""
    },
    "dependencies": {
+      "antd": "^4.23.2",
+      "dynamic-antd-theme": "^0.8.7",
       "express": "^4.17.3",
       "express-promise-router": "^4.1.1",
       "nipplejs": "^0.9.1",
@@ -23,13 +25,13 @@
       "@vitejs/plugin-react": "^2.1.0",
       "dotenv": "^16.0.2",
       "nodemon": "^2.0.15",
+      "prettier": "^2.7.1",
       "react": "^18.2.0",
       "react-dom": "^18.2.0",
       "socket.io-client": "^4.5.2",
-      "three": "^0.143.0",
       "styled-components": "^5.3.5",
-      "vite-plugin-babel-macros": "^1.0.6",
-      "prettier": "^2.7.1"
+      "three": "^0.143.0",
+      "vite-plugin-babel-macros": "^1.0.6"
    },
    "engines": {
       "node": "16.17.0"

@@ -35,19 +35,29 @@ export function useJoystickControls(isTabletOrMobile: boolean) {
       const forward = data.vector.y
       const turn = data.vector.x
 
+      let forwardLimiter = 0
+      if (Math.abs(forward) > 0.4) {
+         forwardLimiter = Math.abs(forward)
+      }
+
       if (forward > 0) {
-         inputs.current.forwardJoy = Math.abs(forward)
+         inputs.current.forwardJoy = forwardLimiter
          inputs.current.backwardJoy = 0
       } else if (forward < 0) {
          inputs.current.forwardJoy = 0
-         inputs.current.backwardJoy = Math.abs(forward)
+         inputs.current.backwardJoy = forwardLimiter
+      }
+
+      let turnLimiter = 0
+      if (Math.abs(turn) > 0.4) {
+         turnLimiter = Math.abs(turn)
       }
 
       if (turn > 0) {
          inputs.current.leftJoy = 0
-         inputs.current.rightJoy = Math.abs(turn)
+         inputs.current.rightJoy = turnLimiter
       } else if (turn < 0) {
-         inputs.current.leftJoy = Math.abs(turn)
+         inputs.current.leftJoy = turnLimiter
          inputs.current.rightJoy = 0
       }
    }

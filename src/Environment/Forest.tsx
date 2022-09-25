@@ -183,7 +183,7 @@ const Forest = ({ largeScenery, smallScenery }) => {
                      case 6:
                         return (
                            <Common1
-                              scale={40}
+                              scale={60}
                               rotation={[-Math.PI / 2, 0, Number(entity[3])]}
                               position={[entity[1], 0, entity[2]]}
                            />
@@ -191,7 +191,7 @@ const Forest = ({ largeScenery, smallScenery }) => {
                      case 7:
                         return (
                            <Common2
-                              scale={40}
+                              scale={80}
                               rotation={[-Math.PI / 2, 0, Number(entity[3])]}
                               position={[entity[1], 0, entity[2]]}
                            />
