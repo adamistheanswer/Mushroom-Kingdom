@@ -74,7 +74,7 @@ export function AvatarAnimated({ rotation, position, playerActions }) {
    }, [actions, actionsInit])
 
    return (
-      <group ref={group} rotation={rotation} position={position} dispose={null}>
+      <group ref={group} rotation={rotation} position={position} dispose={null} name={'avatar'}>
          <group name="Scene" scale={1.6}>
             <group name="Mushy">
                <primitive object={nodes.mixamorigHips} />

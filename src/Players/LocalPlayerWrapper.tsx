@@ -1,9 +1,9 @@
 import React, { useRef, useCallback, useMemo, useState } from 'react'
 import { Text } from '@react-three/drei'
-import { useFrame, extend } from '@react-three/fiber'
-import { Mesh, Vector3, Euler, Group } from 'three'
+import { useFrame, extend, useThree } from '@react-three/fiber'
+import { Vector3, Euler, Group } from 'three'
 import { useMediaQuery } from 'react-responsive'
-import { BoxGeometry, MeshNormalMaterial } from 'three'
+import { BoxGeometry, MeshNormalMaterial, Raycaster } from 'three'
 import { AvatarAnimated } from './AvatarAnimated'
 import { useKeyboardControls } from '../Utils/useKeyboardControls'
 import { useJoystickControls } from '../Utils/useJoystickControls'
@@ -53,15 +53,67 @@ function arrIdentical(a1, a2) {
    return true
 }
 
+const useDirectionalRaycast = (obj, direction) => {
+   const raycaster = useMemo(() => new Raycaster(), [])
+   const upVector = useMemo(() => new Vector3(0, 1, 0), [])
+   const tempVector = useMemo(() => new Vector3(), [])
+   const state = useThree((state) => state)
+
+   let dirFB = 0
+   let dirLR = 0
+
+   if (direction.current === 'forward') dirFB = -1
+   if (direction.current === 'backward') dirFB = 1
+   if (direction.current === 'left') dirLR = -1
+   if (direction.current === 'right') dirLR = 1
+
+   let players = []
+
+   state.scene.children.forEach((child) => {
+      if (child.name === 'playerHitbox') {
+         players.push(child)
+      }
+   })
+
+   return () => {
+      if (!obj.current) return []
+      if (players.length === 0) return []
+      if (!state.controls) return []
+
+      const azimuthAngle = Number(state.controls.getAzimuthalAngle())
+
+      tempVector.set(dirLR, 0, dirFB).applyAxisAngle(upVector, azimuthAngle)
+
+      raycaster.set(obj.current.position.clone(), tempVector)
+      return raycaster.intersectObjects(players)
+   }
+}
+
+function checkPlayerBlocked(intersections) {
+   let blocked = false
+
+   let distances = intersections.map((player) => player.distance)
+
+   distances.forEach((distance) => {
+      if (distance < 5) {
+         blocked = true
+      }
+   })
+
+   return blocked
+}
+
 const LocalPlayerWrapper = ({ clientSocket }) => {
    const meshRef = useRef<Group>(null)
-   const velocity = 1
+   const velocity = 0.6
 
    const lastHeading = useRef(0)
+   const direction = useRef('')
    const lastAction = useRef('Idle')
    const lastPosition = useRef([0, 0, 0])
 
    const tempVector = useMemo(() => new Vector3(), [])
+   const cameraOffset = useMemo(() => new Vector3(), [])
    const tempEuler = useMemo(() => new Euler(), [])
    const upVector = useMemo(() => new Vector3(0, 1, 0), [])
 
@@ -72,12 +124,12 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const [actions, setActions] = useState<string[]>([])
 
    const updatePlayer = useCallback(
-      (state) => {
+      (state, intersections) => {
          const mesh = meshRef.current
 
+         const { forwardJoy, backwardJoy, leftJoy, rightJoy } = joystickControls.current
          const { forward, backward, left, right, dance1, dance2, excited, punch, salute, wave } =
             keyboardControls.current
-         const { forwardJoy, backwardJoy, leftJoy, rightJoy } = joystickControls.current
 
          if (mesh && state.controls && state.camera) {
             const azimuthAngle = Number(state.controls.getAzimuthalAngle().toFixed(2))
@@ -85,46 +137,57 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             let actionsArray: string[] = []
 
             if (forward || forwardJoy !== 0) {
+               direction.current = 'forward'
                tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
 
-               actionsArray.push('Walking')
-               mesh.position.addScaledVector(tempVector, velocity)
+               if (!checkPlayerBlocked(intersections)) {
+                  mesh.position.addScaledVector(tempVector, velocity)
+                  actionsArray.push('Walking')
+               }
             }
 
             if (backward || backwardJoy !== 0) {
+               direction.current = 'backward'
                tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 0.7).applyAxisAngle(upVector, azimuthAngle)
 
-               actionsArray.push('WalkingB')
-               mesh.position.addScaledVector(tempVector, velocity)
+               if (!checkPlayerBlocked(intersections)) {
+                  mesh.position.addScaledVector(tempVector, velocity)
+                  actionsArray.push('WalkingB')
+               }
             }
 
             if (left || leftJoy !== 0) {
+               direction.current = 'left'
                tempVector.set(leftJoy !== 0 ? -leftJoy : -0.7, 0, 0).applyAxisAngle(upVector, azimuthAngle)
 
-               if (backward || backwardJoy !== 0) {
-                  actionsArray.push('StrafeRight')
-               } else {
-                  actionsArray.push('StrafeLeft')
+               if (!checkPlayerBlocked(intersections)) {
+                  mesh.position.addScaledVector(tempVector, velocity)
+                  if (backward || backwardJoy !== 0) {
+                     actionsArray.push('StrafeRight')
+                  } else {
+                     actionsArray.push('StrafeLeft')
+                  }
                }
-
-               mesh.position.addScaledVector(tempVector, velocity)
             }
 
             if (right || rightJoy !== 0) {
+               direction.current = 'right'
                tempVector.set(rightJoy !== 0 ? rightJoy : 0.7, 0, 0).applyAxisAngle(upVector, azimuthAngle)
 
-               if (backward || backwardJoy !== 0) {
-                  actionsArray.push('StrafeLeft')
-               } else {
-                  actionsArray.push('StrafeRight')
+               if (!checkPlayerBlocked(intersections)) {
+                  mesh.position.addScaledVector(tempVector, velocity)
+                  if (backward || backwardJoy !== 0) {
+                     actionsArray.push('StrafeLeft')
+                  } else {
+                     actionsArray.push('StrafeRight')
+                  }
                }
-
-               mesh.position.addScaledVector(tempVector, velocity)
             }
 
             state.camera.position.sub(state.controls.target)
-            state.controls.target.copy(mesh.position)
-            state.camera.position.add(mesh.position)
+            cameraOffset.set(mesh.position.x, mesh.position.y + 7, mesh.position.z)
+            state.controls.target.copy(cameraOffset)
+            state.camera.position.add(cameraOffset)
             mesh.setRotationFromEuler(tempEuler.set(0, azimuthAngle, 0, 'XYZ'))
 
             let meshPositionArr = mesh.position.toArray()
@@ -132,35 +195,19 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             meshPositionArr[1] = 0
             meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
 
-            if (dance1) {
-               actionsArray.push('Dance')
-            }
+            if (dance1) actionsArray.push('Dance')
+            if (dance2) actionsArray.push('Dance2')
+            if (excited) actionsArray.push('Excited')
+            if (punch) actionsArray.push('Punch')
+            if (salute) actionsArray.push('Salute')
+            if (wave) actionsArray.push('Waving')
 
-            if (dance2) {
-               actionsArray.push('Dance2')
-            }
-
-            if (excited) {
-               actionsArray.push('Excited')
-            }
-
-            if (punch) {
-               actionsArray.push('Punch')
-            }
-
-            if (salute) {
-               actionsArray.push('Salute')
-            }
-
-            if (wave) {
-               actionsArray.push('Waving')
-            }
-
-            setActions(actionsArray)
+            let isPlayerStationary = arrIdentical(lastPosition.current, meshPositionArr)
+            let isPlayerRotationChanged = lastHeading.current !== azimuthAngle
 
             if (
-               lastHeading.current === azimuthAngle &&
-               arrIdentical(lastPosition.current, meshPositionArr) &&
+               !isPlayerRotationChanged &&
+               isPlayerStationary &&
                !dance1 &&
                !dance2 &&
                !excited &&
@@ -171,22 +218,17 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
                actionsArray.push('Idle')
             }
 
-            const noChange =
-               lastHeading.current === azimuthAngle &&
-               arrIdentical(lastPosition.current, meshPositionArr) &&
-               lastAction.current === actionsArray.toString()
+            setActions(actionsArray)
 
-            if (lastHeading.current !== azimuthAngle) {
-               lastHeading.current = azimuthAngle
-            }
+            let actionsArrayString = actionsArray.toString()
 
-            if (lastAction.current !== actionsArray.toString()) {
-               lastAction.current = actionsArray.toString()
-            }
+            const noChange = !isPlayerRotationChanged && isPlayerStationary && lastAction.current === actionsArrayString
 
-            if (!arrIdentical(lastPosition.current, meshPositionArr)) {
-               lastPosition.current = meshPositionArr
-            }
+            if (isPlayerRotationChanged) lastHeading.current = azimuthAngle
+
+            if (lastAction.current !== actionsArrayString) lastAction.current = actionsArrayString
+
+            if (!isPlayerStationary) lastPosition.current = meshPositionArr
 
             !noChange &&
                clientSocket.emit('move', {
@@ -199,8 +241,11 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
       [meshRef, velocity, clientSocket]
    )
 
+   const raycast = useDirectionalRaycast(meshRef, direction)
+
    useFrame((state) => {
-      updatePlayer(state)
+      const intersections = raycast()
+      updatePlayer(state, intersections)
    })
 
    return (
