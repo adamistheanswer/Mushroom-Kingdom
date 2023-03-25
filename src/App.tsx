@@ -1,6 +1,6 @@
 import React, { useEffect, Suspense, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { Stats } from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera, Stats } from '@react-three/drei'
 import { io } from 'socket.io-client'
 import parser from 'socket.io-msgpack-parser'
 import Lighting from './Environment/Lighting'
@@ -9,9 +9,6 @@ import Forest from './Environment/Forest'
 import Loader from './Components/Loader'
 import AllPlayersWrapper from './Players/AllPlayersWrapper'
 import LocalPlayerWrapper from './Players/LocalPlayerWrapper'
-
-// import { Color, Fog, BoxGeometry, Material, Mesh } from 'three'
-// extend({ Color, Fog, BoxGeometry, Material, Mesh })
 
 const clientSocket = io({ parser })
 
@@ -30,8 +27,6 @@ const App: React.FC = () => {
          })
       }
    }, [clientSocket])
-
-   console.log('home')
 
    return (
       clientSocket && (

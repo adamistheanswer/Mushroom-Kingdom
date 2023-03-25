@@ -12,7 +12,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
    const meshRef = useRef<Group>(null)
-   const velocity = 1
+   const velocity = 0.7
 
    const lastHeading = useRef(0)
    const lastAction = useRef('Idle')
@@ -80,29 +80,12 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          meshPositionArr[1] = 0
          meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
 
-         if (dance1) {
-            action.current = 'Dance'
-         }
-
-         if (dance2) {
-            action.current = 'Dance2'
-         }
-
-         if (excited) {
-            action.current = 'Excited'
-         }
-
-         if (punch) {
-            action.current = 'Punch'
-         }
-
-         if (salute) {
-            action.current = 'Salute'
-         }
-
-         if (wave) {
-            action.current = 'Waving'
-         }
+         if (dance1) action.current = 'Dance'
+         if (dance2) action.current = 'Dance2'
+         if (excited) action.current = 'Excited'
+         if (punch) action.current = 'Punch'
+         if (salute) action.current = 'Salute'
+         if (wave) action.current = 'Waving'
 
          if (
             lastHeading.current === azimuthAngle &&

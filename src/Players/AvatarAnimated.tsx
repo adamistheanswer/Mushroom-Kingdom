@@ -85,12 +85,16 @@ export function AvatarAnimated({ client, clientSocket, isLocal }) {
          clientSocket.on('clientUpdates', (updatedClients) => {
             setAction(updatedClients[client]?.s)
             if (isLocal) {
-               avatarRef.current.rotation.x = 0
-               avatarRef.current.rotation.y = Math.PI
-               avatarRef.current.rotation.z = 0
-               nameplateRef.current.position.x = 0
-               nameplateRef.current.position.y = nameplateHeight
-               nameplateRef.current.position.z = 0
+               if (avatarRef.current) {
+                  avatarRef.current.rotation.x = 0
+                  avatarRef.current.rotation.y = Math.PI
+                  avatarRef.current.rotation.z = 0
+               }
+               if (nameplateRef.current) {
+                  nameplateRef.current.position.x = 0
+                  nameplateRef.current.position.y = nameplateHeight
+                  nameplateRef.current.position.z = 0
+               }
             } else {
                if (avatarRef.current) {
                   avatarRef.current.rotation.x = 0

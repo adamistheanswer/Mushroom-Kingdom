@@ -1,12 +1,6 @@
-import React, { useRef } from 'react'
-import { useHelper } from '@react-three/drei'
+import React from 'react'
 import { extend } from '@react-three/fiber'
-import {
-   AmbientLight,
-   DirectionalLight,
-   HemisphereLight,
-   DirectionalLightHelper,
-} from 'three'
+import { AmbientLight, DirectionalLight, HemisphereLight, DirectionalLightHelper } from 'three'
 
 extend({
    AmbientLight,
@@ -16,8 +10,6 @@ extend({
 })
 
 export default function Lighting() {
-   const directionalLight = useRef()
-   useHelper(directionalLight, DirectionalLightHelper, 0.5, 'hotpink')
    return (
       <>
          <hemisphereLight
@@ -28,7 +20,6 @@ export default function Lighting() {
          />
          <directionalLight
             args={[0xffffff, 0.3]}
-            // ref={directionalLight}
             position={[-240, 300, 0]}
             position-target={[0, 0, 0]}
             shadow-bias={-0.00001}
