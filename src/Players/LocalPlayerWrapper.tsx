@@ -50,28 +50,24 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
             action.current = 'Walking'
             mesh.position.addScaledVector(tempVector, velocity)
-            console.log('h1')
          }
 
          if (backward || backwardJoy !== 0) {
             tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
             action.current = 'WalkingB'
             mesh.position.addScaledVector(tempVector, velocity)
-            console.log('h2')
          }
 
          if (left || leftJoy !== 0) {
             tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
             action.current = 'StrafeLeft'
             mesh.position.addScaledVector(tempVector, velocity)
-            console.log('h3')
          }
 
          if (right || rightJoy !== 0) {
             tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
             action.current = 'StrafeRight'
             mesh.position.addScaledVector(tempVector, velocity)
-            console.log('h4')
          }
 
          camera.position.sub(orbitControls.target)

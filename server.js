@@ -1,4 +1,6 @@
 import fs from 'fs'
+import * as dotenv from 'dotenv'
+dotenv.config()
 import express from 'express'
 import Router from 'express-promise-router'
 import { createServer } from 'vite'
@@ -17,6 +19,7 @@ if (process.env.ENVIRONMENT === 'local') {
       },
       ...viteConfig,
    })
+   console.log('Vite Middleware Running...')
    router.use(vite.middlewares)
 } else {
    app.use(express.static('dist'))
@@ -52,7 +55,7 @@ ioServer.on('connection', (socket) => {
    clients[socket.id] = {
       p: [0, 0, 0],
       r: 0,
-      s: 'Idle',
+      s: [3],
    }
 
    if (largeScenery.length === 0) {
@@ -63,6 +66,7 @@ ioServer.on('connection', (socket) => {
             Math.floor(Math.random() * 12),
             Math.ceil(Math.random() * 475) * (Math.round(Math.random()) ? 1 : -1),
             Math.ceil(Math.random() * 475) * (Math.round(Math.random()) ? 1 : -1),
+            (Math.random() * (3 - -3 + 1) + -2).toFixed(2),
          ]
       }
 
@@ -80,6 +84,7 @@ ioServer.on('connection', (socket) => {
             Math.floor(Math.random() * 22),
             Math.ceil(Math.random() * 500) * (Math.round(Math.random()) ? 1 : -1),
             Math.ceil(Math.random() * 500) * (Math.round(Math.random()) ? 1 : -1),
+            (Math.random() * (3 - -3 + 1) + -2).toFixed(2),
          ]
       }
 
@@ -92,7 +97,6 @@ ioServer.on('connection', (socket) => {
    ioServer.sockets.emit('clientUpdates', clients)
 
    socket.on('move', ({ r, p, s }) => {
-      console.log(r, p, s)
       if (clients[socket.id]) {
          clients[socket.id].p = p
          clients[socket.id].r = r
@@ -102,7 +106,7 @@ ioServer.on('connection', (socket) => {
 
    setInterval(() => {
       ioServer.sockets.emit('clientUpdates', clients)
-   }, 100)
+   }, 60)
 
    socket.on('disconnect', () => {
       console.log(`User ${socket.id} disconnected - ${ioServer.engine.clientsCount} active users`)

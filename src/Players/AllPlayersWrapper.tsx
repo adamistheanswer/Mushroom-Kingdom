@@ -17,8 +17,8 @@ const AllPlayersWrapper = ({ clientSocket }) => {
       }
    }, [clientSocket])
 
-   return (
-      clients &&
+
+   const allPlayerModels = clients &&
       Object.keys(clients.current)
          .filter((clientKey) => clientKey !== clientSocket.id)
          .map((client) => {
@@ -31,7 +31,9 @@ const AllPlayersWrapper = ({ clientSocket }) => {
                />
             )
          })
-   )
+
+   return <>{allPlayerModels.flat()}</>
+
 }
 
 export default AllPlayersWrapper
