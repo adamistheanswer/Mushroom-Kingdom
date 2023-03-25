@@ -1,11 +1,6 @@
 import React, { useLayoutEffect, useRef } from 'react'
 import { createNoise2D } from 'simplex-noise'
-import { extend } from '@react-three/fiber'
-import { PlaneGeometry } from 'three'
-
-extend({
-   PlaneGeometry,
-})
+import { Float32BufferAttribute, PlaneGeometry } from 'three'
 
 const Ground: React.FC = () => {
    const noise2D = createNoise2D()
@@ -13,7 +8,7 @@ const Ground: React.FC = () => {
    const terrain = useRef<PlaneGeometry>(null!)
 
    useLayoutEffect(() => {
-      let pos = terrain.current.getAttribute('position')
+      let pos = terrain.current.getAttribute('position') as Float32BufferAttribute
       let pa = pos.array
 
       const hVerts = terrain.current.parameters.heightSegments + 1
@@ -40,12 +35,8 @@ const Ground: React.FC = () => {
 
    return (
       <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-         <planeBufferGeometry
-            attach="geometry"
-            args={[1000, 1000, 1000, 1000]}
-            ref={terrain}
-         />
-         <meshPhongMaterial attach="material" color="#5EA274" />
+         <planeGeometry attach="geometry" args={[1000, 1000, 1000, 1000]} ref={terrain} />
+         <meshStandardMaterial attach="material" color="#5EA274" />
       </mesh>
    )
 }

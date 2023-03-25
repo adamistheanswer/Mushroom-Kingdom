@@ -1,27 +1,22 @@
-import React, { useRef, useCallback, useMemo, useState } from 'react'
-import { OrbitControls, PerspectiveCamera, Text, Html } from '@react-three/drei'
-import { useFrame, extend } from '@react-three/fiber'
+import React, { useRef, useCallback, useMemo } from 'react'
+import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { Mesh, Vector3, Euler, Group } from 'three'
+import { Vector3, Euler, Group } from 'three'
 import { useMediaQuery } from 'react-responsive'
-import { BoxGeometry, MeshNormalMaterial } from 'three'
 import { AvatarAnimated } from './AvatarAnimated'
 import { useKeyboardControls } from '../Utils/useKeyboardControls'
 import { useJoystickControls } from '../Utils/useJoystickControls'
 
-extend({
-   BoxGeometry,
-   MeshNormalMaterial,
-})
-
 const LocalPlayerWrapper = ({ clientSocket }) => {
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
-   const meshRef = useRef<Mesh | Group>(null)
+   const meshRef = useRef<Group>(null)
    const velocity = 1
 
    const lastHeading = useRef(0)
    const lastAction = useRef('Idle')
+   const action = useRef('Idle')
    const lastPosition = useRef([0, 0, 0])
 
    const tempVector = useMemo(() => new Vector3(), [])
@@ -30,8 +25,6 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
    const joystickControls = useJoystickControls(isTabletOrMobile)
    const keyboardControls = useKeyboardControls()
-
-   const [action, setAction] = useState('Idle')
 
    const updatePlayer = useCallback(() => {
       const mesh = meshRef.current
@@ -55,27 +48,30 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
          if (forward || forwardJoy !== 0) {
             tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
-            setAction('Walking')
+            action.current = 'Walking'
             mesh.position.addScaledVector(tempVector, velocity)
+            console.log('h1')
          }
 
          if (backward || backwardJoy !== 0) {
             tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
-            setAction('WalkingB')
+            action.current = 'WalkingB'
             mesh.position.addScaledVector(tempVector, velocity)
+            console.log('h2')
          }
 
          if (left || leftJoy !== 0) {
             tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-
-            setAction('StrafeLeft')
+            action.current = 'StrafeLeft'
             mesh.position.addScaledVector(tempVector, velocity)
+            console.log('h3')
          }
 
          if (right || rightJoy !== 0) {
             tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-            setAction('StrafeRight')
+            action.current = 'StrafeRight'
             mesh.position.addScaledVector(tempVector, velocity)
+            console.log('h4')
          }
 
          camera.position.sub(orbitControls.target)
@@ -89,27 +85,27 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
 
          if (dance1) {
-            setAction('Dance')
+            action.current = 'Dance'
          }
 
          if (dance2) {
-            setAction('Dance2')
+            action.current = 'Dance2'
          }
 
          if (excited) {
-            setAction('Excited')
+            action.current = 'Excited'
          }
 
          if (punch) {
-            setAction('Punch')
+            action.current = 'Punch'
          }
 
          if (salute) {
-            setAction('Salute')
+            action.current = 'Salute'
          }
 
          if (wave) {
-            setAction('Waving')
+            action.current = 'Waving'
          }
 
          if (
@@ -122,20 +118,20 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             !salute &&
             !wave
          ) {
-            setAction('Idle')
+            action.current = 'Idle'
          }
 
          const noChange =
             lastHeading.current === azimuthAngle &&
             arrIdentical(lastPosition.current, meshPositionArr) &&
-            lastAction.current === action
+            lastAction.current === action.current
 
          if (lastHeading.current !== azimuthAngle) {
             lastHeading.current = azimuthAngle
          }
 
-         if (lastAction.current !== action) {
-            lastAction.current = action
+         if (lastAction.current !== action.current) {
+            lastAction.current = action.current
          }
 
          if (!arrIdentical(lastPosition.current, meshPositionArr)) {
@@ -146,7 +142,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             clientSocket.emit('move', {
                r: azimuthAngle,
                p: meshPositionArr,
-               s: action,
+               s: action.current,
             })
       }
    }, [meshRef, orbitRef, camRef, velocity, action, clientSocket])
@@ -170,17 +166,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          />
 
          <group ref={meshRef}>
-            <Text
-               rotation={[0, 0, 0]}
-               position={[0, 13, 0]}
-               fontSize={1}
-               color="yellow"
-               anchorX="center"
-               anchorY="middle"
-            >
-               {clientSocket.id}
-            </Text>
-            <AvatarAnimated action={action} position={null} rotation={[0, Math.PI, 0]} />
+            <AvatarAnimated clientSocket={clientSocket} client={clientSocket.id} isLocal={true} />
          </group>
       </>
    )
