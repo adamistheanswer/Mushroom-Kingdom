@@ -101,7 +101,7 @@ ioServer.on('connection', (socket) => {
 
    setInterval(() => {
       ioServer.sockets.emit('clientUpdates', clients)
-   }, 20)
+   }, 60)
 
    socket.on('disconnect', () => {
       console.log(`User ${socket.id} disconnected - ${ioServer.engine.clientsCount} active users`)
