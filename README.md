@@ -38,3 +38,8 @@ Suggestions with improving the server and moving from Socket.io would be much ap
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
+
+## 3D Assets 
+
+[Nature Pack](https://quaternius.com/)
+
