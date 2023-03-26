@@ -23,12 +23,12 @@
       "@vitejs/plugin-react": "3.1.0",
       "dotenv": "16.0.2",
       "nodemon": "2.0.22",
+      "prettier": "2.8.7",
       "react": "18.2.0",
       "react-dom": "18.2.0",
       "socket.io-client": "4.6.1",
       "styled-components": "5.3.9",
-      "vite-plugin-babel-macros": "1.0.6",
-      "prettier": "2.8.7"
+      "vite-plugin-babel-macros": "1.0.6"
    },
    "peerDependencies": {
       "three": ">=0.137"
