@@ -32,7 +32,7 @@ const App: React.FC = () => {
       clientSocket && (
          <div style={{ width: '100%', height: '100vh' }}>
             <Canvas shadows>
-               <Stats />
+               {/* <Stats /> */}
                <PerspectiveCamera position={[25, 20, 25]} fov={70} makeDefault />
                <OrbitControls
                   autoRotate={false}
