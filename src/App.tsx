@@ -33,6 +33,17 @@ const App: React.FC = () => {
          <div style={{ width: '100%', height: '100vh' }}>
             <Canvas shadows>
                <Stats />
+               <PerspectiveCamera position={[25, 20, 25]} fov={70} makeDefault />
+               <OrbitControls
+                  autoRotate={false}
+                  enableDamping={false}
+                  enableZoom={false}
+                  enablePan={false}
+                  rotateSpeed={0.4}
+                  target={[0, 0, 0]}
+                  maxPolarAngle={Math.PI / 2}
+                  makeDefault
+               />
                <color attach="background" args={['black']} />
                <fog attach="fog" color="black" near={50} far={300} />
                <Lighting />
