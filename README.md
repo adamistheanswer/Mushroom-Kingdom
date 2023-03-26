@@ -1,4 +1,4 @@
-# Mushroom Kingdom
+# 🍄 Mushroom Kingdom 🍄
 
 A multiplayer game starter built with React Three Fibre (R3F), Node.js, Socket.io & Vite.
 
