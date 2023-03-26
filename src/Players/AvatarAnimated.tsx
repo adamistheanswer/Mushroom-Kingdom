@@ -88,7 +88,6 @@ export function AvatarAnimated({ client, clientSocket, isLocal }) {
          clientSocket.on('clientUpdates', (updatedClients) => {
             setAction(updatedClients[client]?.s)
             if (isLocal) {
-               console.log(updatedClients[client]?.s)
                if (avatarRef.current) {
                   avatarRef.current.rotation.x = 0
                   avatarRef.current.rotation.y = Math.PI
@@ -152,13 +151,3 @@ export function AvatarAnimated({ client, clientSocket, isLocal }) {
 }
 
 useGLTF.preload('../Models/Player/FullMushy.gltf')
-
-function usePrevious(value) {
-   const ref = useRef('Idle')
-
-   useEffect(() => {
-      ref.current = value
-   }, [value])
-
-   return ref.current
-}
