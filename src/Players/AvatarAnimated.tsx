@@ -5,6 +5,7 @@ import { clone as SkeletonUtilsClone } from 'three/examples/jsm/utils/SkeletonUt
 import { useFrame, useGraph, useThree } from '@react-three/fiber'
 import { Bone, SkinnedMesh, MeshStandardMaterial } from 'three'
 import { Text } from '@react-three/drei'
+import { actionsArr } from '../Utils/playerActionsToIndexes'
 
 type GLTFResult = GLTF & {
    nodes: {
@@ -48,25 +49,27 @@ function useSkinnedMeshClone(path) {
 }
 
 export function AvatarAnimated({ client, clientSocket, isLocal }) {
-   const [action, setAction] = useState('Idle')
+   const [action, setAction] = useState('3')
    const group = useRef<THREE.Group>(null!)
    const avatarRef = useRef<THREE.Group>(null!)
    const nameplateRef = useRef<THREE.Group>(null!)
    const { camera } = useThree()
-   const previousAction = usePrevious(action)
    const nameplateHeight = 13
    const { materials, animations, nodes } = useSkinnedMeshClone('../Models/Player/FullMushy.gltf')
    // @ts-ignore
    const { actions } = useAnimations<GLTFActions>(animations, group)
 
    useEffect(() => {
-      if (previousAction) {
-         actions[previousAction].fadeOut(0.2)
-         actions[action].stop()
-      }
-      actions[action].play()
-      actions[action].fadeIn(0.2)
-   }, [actions, action, previousAction])
+      let currentArr = action.split(',')
+      currentArr.forEach((index) => {
+         actions[actionsArr[index]]?.reset().fadeIn(0.4).play()
+      })
+
+      return () =>
+         void currentArr.forEach((index) => {
+            actions[actionsArr[index]]?.fadeOut(0.4)
+         })
+   }, [actions, action])
 
    useFrame(() => {
       if (isLocal) {
@@ -85,6 +88,7 @@ export function AvatarAnimated({ client, clientSocket, isLocal }) {
          clientSocket.on('clientUpdates', (updatedClients) => {
             setAction(updatedClients[client]?.s)
             if (isLocal) {
+               console.log(updatedClients[client]?.s)
                if (avatarRef.current) {
                   avatarRef.current.rotation.x = 0
                   avatarRef.current.rotation.y = Math.PI
