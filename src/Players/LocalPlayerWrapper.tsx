@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useMemo } from 'react'
-import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Vector3, Euler, Group } from 'three'
@@ -7,6 +7,16 @@ import { useMediaQuery } from 'react-responsive'
 import { AvatarAnimated } from './AvatarAnimated'
 import { useKeyboardControls } from '../Utils/useKeyboardControls'
 import { useJoystickControls } from '../Utils/useJoystickControls'
+import { playerActionsToIndexes } from '../Utils/playerActionsToIndexes'
+
+function arrIdentical(a1, a2) {
+   let i = a1.length
+   if (i != a2.length) return false
+   while (i--) {
+      if (a1[i] !== a2[i]) return false
+   }
+   return true
+}
 
 const LocalPlayerWrapper = ({ clientSocket }) => {
    const orbitRef = useRef<OrbitControlsImpl>(null)
@@ -34,40 +44,42 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
       const { forward, backward, left, right, dance1, dance2, excited, punch, salute, wave } = keyboardControls.current
       const { forwardJoy, backwardJoy, leftJoy, rightJoy } = joystickControls.current
 
-      function arrIdentical(a1, a2) {
-         let i = a1.length
-         if (i != a2.length) return false
-         while (i--) {
-            if (a1[i] !== a2[i]) return false
-         }
-         return true
-      }
-
       if (mesh && orbitControls && camera) {
          const azimuthAngle = Number(orbitControls.getAzimuthalAngle().toFixed(2))
-
+         let actionsArray: string[] = []
          if (forward || forwardJoy !== 0) {
             tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
-            action.current = 'Walking'
+
+            actionsArray.push('Walking')
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
          if (backward || backwardJoy !== 0) {
             tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
-            action.current = 'WalkingB'
+
+            actionsArray.push('WalkingB')
             mesh.position.addScaledVector(tempVector, velocity)
          }
 
          if (left || leftJoy !== 0) {
             tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-            action.current = 'StrafeLeft'
+
             mesh.position.addScaledVector(tempVector, velocity)
+            if (backward || backwardJoy !== 0) {
+               actionsArray.push('StrafeRight')
+            } else {
+               actionsArray.push('StrafeLeft')
+            }
          }
 
          if (right || rightJoy !== 0) {
             tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-            action.current = 'StrafeRight'
             mesh.position.addScaledVector(tempVector, velocity)
+            if (backward || backwardJoy !== 0) {
+               actionsArray.push('StrafeLeft')
+            } else {
+               actionsArray.push('StrafeRight')
+            }
          }
 
          camera.position.sub(orbitControls.target)
@@ -80,16 +92,19 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          meshPositionArr[1] = 0
          meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
 
-         if (dance1) action.current = 'Dance'
-         if (dance2) action.current = 'Dance2'
-         if (excited) action.current = 'Excited'
-         if (punch) action.current = 'Punch'
-         if (salute) action.current = 'Salute'
-         if (wave) action.current = 'Waving'
+         if (dance1) actionsArray.push('Dance')
+         if (dance2) actionsArray.push('Dance2')
+         if (excited) actionsArray.push('Excited')
+         if (punch) actionsArray.push('Punch')
+         if (salute) actionsArray.push('Salute')
+         if (wave) actionsArray.push('Waving')
+
+         let isPlayerStationary = arrIdentical(lastPosition.current, meshPositionArr)
+         let isPlayerRotationChanged = lastHeading.current !== azimuthAngle
 
          if (
-            lastHeading.current === azimuthAngle &&
-            arrIdentical(lastPosition.current, meshPositionArr) &&
+            !isPlayerRotationChanged &&
+            isPlayerStationary &&
             !dance1 &&
             !dance2 &&
             !excited &&
@@ -97,33 +112,27 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             !salute &&
             !wave
          ) {
-            action.current = 'Idle'
+            actionsArray.push('Idle')
          }
 
-         const noChange =
-            lastHeading.current === azimuthAngle &&
-            arrIdentical(lastPosition.current, meshPositionArr) &&
-            lastAction.current === action.current
+         let actionsArrayString = actionsArray.toString()
 
-         if (lastHeading.current !== azimuthAngle) {
-            lastHeading.current = azimuthAngle
-         }
+         const noChange = !isPlayerRotationChanged && isPlayerStationary && lastAction.current === actionsArrayString
 
-         if (lastAction.current !== action.current) {
-            lastAction.current = action.current
-         }
+         if (isPlayerRotationChanged) lastHeading.current = azimuthAngle
 
-         if (!arrIdentical(lastPosition.current, meshPositionArr)) {
-            lastPosition.current = meshPositionArr
-         }
+         if (lastAction.current !== actionsArrayString) lastAction.current = actionsArrayString
+
+         if (!isPlayerStationary) lastPosition.current = meshPositionArr
 
          !noChange &&
             clientSocket.emit('move', {
                r: azimuthAngle,
                p: meshPositionArr,
-               s: action.current,
+               s: actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3',
             })
       }
+      //  actionsArray.toString()
    }, [meshRef, orbitRef, camRef, velocity, action, clientSocket])
 
    useFrame(() => {
