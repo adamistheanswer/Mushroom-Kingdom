@@ -11,6 +11,7 @@ import { OrbitControls } from '@react-three/drei'
 import useUserStore from '../State/userStore'
 import { NamePlate } from './NamePlate'
 import throttle from 'lodash/throttle'
+import { encode } from '@msgpack/msgpack'
 
 function arrIdentical(a1, a2) {
    let i = a1.length
@@ -45,7 +46,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    const sendClientUpdate = useCallback(
       throttle((data) => {
-         clientSocket.send(JSON.stringify(data))
+         clientSocket.send(encode(data))
       }, 20),
       [clientSocket]
    )

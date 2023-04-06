@@ -7,6 +7,7 @@ import http from 'http'
 import Router from 'express-promise-router'
 import 'dotenv/config'
 import ShortUniqueId from 'short-unique-id'
+import { encode, decode } from "@msgpack/msgpack";
 
 const uid = new ShortUniqueId({ length: 10 })
 
@@ -52,34 +53,44 @@ function randomBetween(min, max) {
 }
 
 function sendLargeScenery(client) {
-   const message = {
+   const response = {
       type: 'largeScenery',
       payload: largeScenery,
    }
-   client.send(JSON.stringify(message))
+   const encodedResponse = encode(response)
+   client.send(encodedResponse)
 }
 
 function sendSmallScenery(client) {
-   const message = {
+   const response = {
       type: 'smallScenery',
       payload: smallScenery,
    }
-   client.send(JSON.stringify(message))
+   const encodedResponse = encode(response)
+   client.send(encodedResponse)
 }
 
 function sendClientUpdates() {
-   const message = {
+   const response = {
       type: 'clientUpdates',
       payload: Array.from(clients.entries()).reduce((acc, [key, value]) => {
          acc[key] = value
          return acc
       }, {}),
    }
-   const serializedMessage = JSON.stringify(message)
-
+   const encodedResponse = encode(response)
    wsServer.clients.forEach((client) => {
-      client.send(serializedMessage)
+      client.send(encodedResponse)
    })
+}
+
+function sendClientId(client, clientId) {
+   const response = {
+      type: 'clientId',
+      payload: clientId,
+   }
+   const encodedResponse = encode(response)
+   client.send(encodedResponse)
 }
 
 wsServer.on('connection', (socket) => {
@@ -87,7 +98,7 @@ wsServer.on('connection', (socket) => {
 
    console.log(`User ${clientId} connected - ${clients.size + 1} active users`)
 
-   socket.send(JSON.stringify({ type: 'clientId', payload: clientId }))
+   sendClientId(socket, clientId)
 
    clients.set(clientId, {
       position: { x: 0, y: 0, z: 0 },
@@ -123,12 +134,11 @@ wsServer.on('connection', (socket) => {
    sendSmallScenery(socket)
 
    socket.on('message', (data) => {
-      const message = JSON.parse(data)
+      const message = decode(data)
       if (message.type === 'move') {
          const { rotation, position, action } = message.payload
          console.log(message.payload)
          if (clients.get(clientId)) {
-
             clients.get(clientId).position = position
             clients.get(clientId).rotation = rotation
             clients.get(clientId).action = action
@@ -153,11 +163,12 @@ wsServer.on('connection', (socket) => {
          type: 'clientDisconnect',
          payload: clientId,
       }
-      const serializedDisconnectMessage = JSON.stringify(disconnectMessage)
 
+      const encodedResponse = encode(disconnectMessage)
+     
       wsServer.clients.forEach((client) => {
          if (client !== socket) {
-            client.send(serializedDisconnectMessage)
+            client.send(encodedResponse)
          }
       })
    })

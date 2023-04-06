@@ -5,6 +5,7 @@ import { clone as SkeletonUtilsClone } from 'three/examples/jsm/utils/SkeletonUt
 import { useGraph } from '@react-three/fiber'
 import { actionsArr } from '../Utils/playerActionsToIndexes'
 import { Bone, SkinnedMesh, MeshStandardMaterial, Vector3, Euler, AnimationAction, Group } from 'three'
+import { decode } from '@msgpack/msgpack'
 
 interface AvatarProps {
    position: Vector3
@@ -12,6 +13,12 @@ interface AvatarProps {
    clientSocket: any
    clientId: any
 }
+
+interface WebSocketMessage {
+   type: string;
+   payload: any;
+ }
+
 
 type GLTFResult = GLTF & {
    nodes: {
@@ -59,9 +66,9 @@ export const Avatar = React.memo<AvatarProps>(
 
       useEffect(() => {
          const handleAnimations = (event) => {
-            const data = JSON.parse(event.data)
-            if (data.type === 'clientUpdates') {
-               const updatedClients = data.payload
+            const message = decode(new Uint8Array(event.data)) as WebSocketMessage;
+            if (message.type === 'clientUpdates') {
+               const updatedClients = message.payload
                setCurrentAction(updatedClients[clientId].action)
             }
          }

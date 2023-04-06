@@ -3,6 +3,12 @@ import { Avatar } from './Avatar'
 import useUserStore from '../State/userStore'
 import { Euler, Vector3 } from 'three'
 import { NamePlate } from './NamePlate'
+import { decode } from '@msgpack/msgpack'
+
+interface WebSocketMessage {
+   type: string
+   payload: any
+}
 
 function mapsEqual(a, b) {
    if (a.size !== b.size) return false
@@ -18,9 +24,9 @@ const RemotePlayers = ({ clientSocket }) => {
 
    useEffect(() => {
       const handleClientUpdates = (event) => {
-         const data = JSON.parse(event.data)
-         if (data.type === 'clientUpdates') {
-            const updatedClients = data.payload
+         const message = decode(new Uint8Array(event.data)) as WebSocketMessage
+         if (message.type === 'clientUpdates') {
+            const updatedClients = message.payload
 
             setPlayerPositions((prevPositions) => {
                const newPositions = new Map(prevPositions)
@@ -32,8 +38,8 @@ const RemotePlayers = ({ clientSocket }) => {
                }
                return mapsEqual(prevPositions, newPositions) ? prevPositions : newPositions
             })
-         } else if (data.type === 'clientDisconnect') {
-            const disconnectedClientId = data.payload
+         } else if (message.type === 'clientDisconnect') {
+            const disconnectedClientId = message.payload
             setPlayerPositions((prevPositions) => {
                const newPositions = new Map(prevPositions)
                newPositions.delete(disconnectedClientId)
