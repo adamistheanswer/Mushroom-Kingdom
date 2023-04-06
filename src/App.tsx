@@ -1,61 +1,73 @@
-import React, { useEffect, Suspense, useRef } from 'react'
+import React, { useEffect, Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, Stats } from '@react-three/drei'
-import { io } from 'socket.io-client'
-import parser from 'socket.io-msgpack-parser'
+import { PerspectiveCamera, Stats } from '@react-three/drei'
 import Lighting from './Environment/Lighting'
 import Ground from './Environment/Ground'
 import Forest from './Environment/Forest'
 import Loader from './Components/Loader'
-import AllPlayersWrapper from './Players/AllPlayersWrapper'
-import LocalPlayerWrapper from './Players/LocalPlayerWrapper'
+import RemotePlayers from './Players/RemotePlayers'
+import LocalPlayer from './Players/LocalPlayer'
+import useUserStore from './State/userStore'
+import { decode } from '@msgpack/msgpack'
 
-const clientSocket = io({ parser })
+const socket = new WebSocket('ws://localhost:8080')
+
+socket.binaryType = 'arraybuffer'
+
+interface WebSocketMessage {
+   type: string;
+   payload: any;
+ }
 
 const App: React.FC = () => {
-   const largeScenery = useRef([])
-   const smallScenery = useRef([])
+   const [largeScenery, setLargeScenery] = useState([])
+   const [smallScenery, setSmallScenery] = useState([])
+
+   const setClientId = useUserStore((state) => state.setClientId)
 
    useEffect(() => {
-      if (clientSocket) {
-         clientSocket.on('largeScenery', (objects) => {
-            largeScenery.current = objects
-         })
+      socket.addEventListener('message', (event) => {
+         const message = decode(new Uint8Array(event.data)) as WebSocketMessage;
 
-         clientSocket.on('smallScenery', (objects) => {
-            smallScenery.current = objects
-         })
+         if (message.type === 'largeScenery') {
+            setLargeScenery(message.payload)
+         }
+
+         if (message.type === 'smallScenery') {
+            setSmallScenery(message.payload)
+         }
+
+         if (message.type === 'clientId') {
+            setClientId(message.payload)
+         }
+      })
+
+      socket.addEventListener('error', (event) => {
+         console.error('WebSocket error:', event)
+      })
+
+      return () => {
+         socket.close()
       }
-   }, [clientSocket])
+   }, [])
 
    return (
-      clientSocket && (
-         <div style={{ width: '100%', height: '100vh' }}>
-            <Canvas shadows>
-               {/* <Stats /> */}
-               <PerspectiveCamera position={[25, 20, 25]} fov={70} makeDefault />
-               <OrbitControls
-                  autoRotate={false}
-                  enableDamping={false}
-                  enableZoom={false}
-                  enablePan={false}
-                  rotateSpeed={0.4}
-                  target={[0, 0, 0]}
-                  maxPolarAngle={Math.PI / 2}
-                  makeDefault
-               />
-               <color attach="background" args={['black']} />
-               <fog attach="fog" color="black" near={50} far={300} />
-               <Lighting />
-               <Suspense fallback={<Loader />}>
-                  <AllPlayersWrapper clientSocket={clientSocket} />
-                  <LocalPlayerWrapper clientSocket={clientSocket} />
-                  <Ground />
-                  <Forest largeScenery={largeScenery} smallScenery={smallScenery} />
-               </Suspense>
-            </Canvas>
-         </div>
-      )
+      <div style={{ width: '100%', height: '100vh' }}>
+         <Canvas shadows>
+            <Stats />
+            <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
+
+            <color attach="background" args={['black']} />
+            <fog attach="fog" color="black" near={50} far={300} />
+            <Lighting />
+            <Suspense fallback={<Loader />}>
+               <RemotePlayers clientSocket={socket} />
+               <LocalPlayer clientSocket={socket} />
+               <Ground />
+               <Forest largeScenery={largeScenery} smallScenery={smallScenery} />
+            </Suspense>
+         </Canvas>
+      </div>
    )
 }
 
