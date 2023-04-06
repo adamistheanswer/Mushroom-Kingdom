@@ -10,7 +10,7 @@ import LocalPlayer from './Players/LocalPlayer'
 import useUserStore from './State/userStore'
 import { decode } from '@msgpack/msgpack'
 
-const socket = new WebSocket('ws://localhost:8080')
+const socket = new WebSocket(`ws://${window.location.host}`)
 
 socket.binaryType = 'arraybuffer'
 

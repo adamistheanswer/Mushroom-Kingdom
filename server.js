@@ -7,7 +7,7 @@ import http from 'http'
 import Router from 'express-promise-router'
 import 'dotenv/config'
 import ShortUniqueId from 'short-unique-id'
-import { encode, decode } from "@msgpack/msgpack";
+import { encode, decode } from '@msgpack/msgpack'
 
 const uid = new ShortUniqueId({ length: 10 })
 
@@ -165,7 +165,7 @@ wsServer.on('connection', (socket) => {
       }
 
       const encodedResponse = encode(disconnectMessage)
-     
+
       wsServer.clients.forEach((client) => {
          if (client !== socket) {
             client.send(encodedResponse)
@@ -173,6 +173,12 @@ wsServer.on('connection', (socket) => {
       })
    })
 })
+
+const updateInterval = setInterval(sendClientUpdates, 100);
+
+process.on('SIGTERM', () => {
+   clearInterval(updateInterval);
+ });
 
 httpServer.listen(process.env.PORT || 8080, () => {
    console.log(`Listening on port http://localhost:8080...`)
