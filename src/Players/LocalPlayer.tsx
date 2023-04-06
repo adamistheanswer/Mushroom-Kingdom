@@ -3,11 +3,14 @@ import { useFrame } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Vector3, Euler, Group } from 'three'
 import { useMediaQuery } from 'react-responsive'
-import { AvatarAnimated } from './AvatarAnimated2'
+import { Avatar } from './Avatar'
 import { useKeyboardControls } from '../Utils/useKeyboardControls'
 import { useJoystickControls } from '../Utils/useJoystickControls'
 import { playerActionsToIndexes } from '../Utils/playerActionsToIndexes'
 import { OrbitControls } from '@react-three/drei'
+import useUserStore from '../State/userStore'
+import { NamePlate } from './NamePlate'
+import throttle from 'lodash/throttle'
 
 function arrIdentical(a1, a2) {
    let i = a1.length
@@ -19,10 +22,13 @@ function arrIdentical(a1, a2) {
 }
 
 const LocalPlayerWrapper = ({ clientSocket }) => {
+   const localClientId = useUserStore((state) => state.localClientId)
+
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
    const groupRef = useRef<Group>(null!)
-   const velocity = 0.7
+   const playerAction = useRef('3')
+   const velocity = 0.6
 
    const lastHeading = useRef(0)
    const lastAction = useRef('3')
@@ -36,6 +42,13 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
    const joystickControls = useJoystickControls(isTabletOrMobile)
    const keyboardControls = useKeyboardControls()
+
+   const sendClientUpdate = useCallback(
+      throttle((data) => {
+         clientSocket.send(JSON.stringify(data))
+      }, 20),
+      [clientSocket]
+   )
 
    const updatePlayer = useCallback(
       (state) => {
@@ -90,9 +103,9 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             group.setRotationFromEuler(tempEuler.set(0, azimuthAngle, 0, 'XYZ'))
 
             let meshPositionArr = group.position.toArray()
-            meshPositionArr[0] = Number(meshPositionArr[0].toFixed(2))
+            meshPositionArr[0] = Math.round(meshPositionArr[0] * 100) / 100
             meshPositionArr[1] = 0
-            meshPositionArr[2] = Number(meshPositionArr[2].toFixed(2))
+            meshPositionArr[2] = Math.round(meshPositionArr[2] * 100) / 100
 
             if (dance1) actionsArray.push('Dance')
             if (dance2) actionsArray.push('Dance2')
@@ -127,20 +140,20 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
             if (!isPlayerStationary) lastPosition.current = meshPositionArr
 
+            playerAction.current = actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3'
+
             !noChange &&
-               clientSocket.send(
-                  JSON.stringify({
-                     type: 'move',
-                     payload: {
-                        rotation: groupRef.current?.rotation.toArray().slice(0, -1),
-                        position: groupRef.current?.position,
-                        action: actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3',
-                     },
-                  })
-               )
+               sendClientUpdate({
+                  type: 'move',
+                  payload: {
+                     rotation: groupRef.current?.rotation.toArray().slice(0, -1),
+                     position: groupRef.current?.position,
+                     action: actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3',
+                  },
+               })
          }
       },
-      [groupRef, orbitRef, camRef, velocity, clientSocket]
+      [groupRef, orbitRef, camRef, velocity, playerAction, clientSocket]
    )
 
    useFrame((state) => {
@@ -149,7 +162,13 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    return (
       <group ref={groupRef}>
-         <AvatarAnimated position={groupRef.current?.position} rotation={groupRef.current?.rotation}  />
+         <NamePlate key={localClientId} position={groupRef.current?.position} clientId={localClientId} isLocal={true} />
+         <Avatar
+            position={groupRef.current?.position}
+            rotation={groupRef.current?.rotation}
+            clientId={localClientId}
+            clientSocket={clientSocket}
+         />
          <OrbitControls
             ref={orbitRef}
             target={groupRef.current?.position}

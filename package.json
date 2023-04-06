@@ -9,6 +9,8 @@
    "dependencies": {
       "express": "4.18.2",
       "express-promise-router": "4.1.1",
+      "lodash": "^4.17.21",
+      "msgpack-lite": "^0.1.26",
       "nipplejs": "0.10.1",
       "react-responsive": "9.0.2",
       "short-unique-id": "^4.4.4",

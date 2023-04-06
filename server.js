@@ -92,7 +92,7 @@ wsServer.on('connection', (socket) => {
    clients.set(clientId, {
       position: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
-      action: [3],
+      action: '3',
    })
 
    if (largeScenery.length === 0) {

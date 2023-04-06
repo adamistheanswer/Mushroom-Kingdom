@@ -1,55 +1,8 @@
-// import React, { useState, useEffect, useRef } from 'react'
-// import { AvatarAnimated } from './AvatarAnimated'
-// import useUserStore from '../State/userStore'
-
-// const RemotePlayers = ({ clientSocket }) => {
-//    const [clientsConnected, setClientsConnected] = useState(0)
-//    const clientId = useUserStore((state) => state.clientId)
-//    const clients = useRef({})
-
-//    useEffect(() => {
-//       if (clientSocket) {
-//         clientSocket.addEventListener('message', (event) => {
-//           const data = JSON.parse(event.data);
-//           if (data.type === 'clientUpdates') {
-
-//             const updatedClients = data.payload;
-//             console.log(updatedClients)
-//             clients.current = updatedClients;
-//             if (Object.keys(updatedClients).length !== clientsConnected) {
-//               setClientsConnected(Object.keys(updatedClients).length);
-//             }
-//           }
-//         });
-//       }
-
-//       return () => {
-//         if (clientSocket) {
-//           clientSocket.removeEventListener('message');
-//         }
-//       };
-//     }, [clientSocket]);
-
-//    const allPlayerModels =
-//       clients &&
-//       Object.keys(clients.current)
-//          // .filter((clientKey) => clientKey !== clientId)
-//          .map((client) => {
-//             return (
-//                <AvatarAnimated key={client} client={client} clientSocket={clientSocket} isLocal={clientId === client} />
-//             )
-//          })
-//          .flat()
-
-//    return <>{allPlayerModels}</>
-// }
-
-// export default RemotePlayers
-
 import React, { useState, useEffect } from 'react'
-import { AvatarAnimated } from './AvatarAnimated2'
+import { Avatar } from './Avatar'
 import useUserStore from '../State/userStore'
 import { Euler, Vector3 } from 'three'
+import { NamePlate } from './NamePlate'
 
 function mapsEqual(a, b) {
    if (a.size !== b.size) return false
@@ -102,8 +55,19 @@ const RemotePlayers = ({ clientSocket }) => {
 
    const remotePlayerModels = Array.from(playerPositions.entries()).map(([clientId, data]) => {
       const position = new Vector3(data.position.x, data.position.y, data.position.z)
-      const rotation = new Euler(data.rotation[0], data.rotation[1] + Math.PI , data.rotation[2])
-      return <AvatarAnimated key={clientId} position={position} rotation={rotation} />
+      const rotation = new Euler(data.rotation[0], data.rotation[1], data.rotation[2])
+      return (
+         <>
+            <NamePlate key={clientId} position={position} clientId={clientId} isLocal={false} />
+            <Avatar
+               key={clientId}
+               position={position}
+               rotation={rotation}
+               clientId={clientId}
+               clientSocket={clientSocket}
+            />
+         </>
+      )
    })
 
    return <>{remotePlayerModels.flat()}</>

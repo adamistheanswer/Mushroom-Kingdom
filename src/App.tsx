@@ -74,7 +74,7 @@ const App: React.FC = () => {
             <Lighting />
             <Suspense fallback={<Loader />}>
                <RemotePlayers clientSocket={socket} />
-               <LocalPlayer clientSocket={socket} />
+               <LocalPlayer clientSocket={socket}/>
                <Ground />
                <Forest largeScenery={largeScenery} smallScenery={smallScenery} />
             </Suspense>
