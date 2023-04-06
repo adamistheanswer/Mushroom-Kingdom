@@ -10,8 +10,11 @@ import LocalPlayer from './Players/LocalPlayer'
 import useUserStore from './State/userStore'
 import { decode } from '@msgpack/msgpack'
 
-const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const socket = new WebSocket(`${protocol}//${window.location.hostname}:8080`);
+// const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+// const socket = new WebSocket(`${protocol}//${window.location.hostname}:8080`);
+
+const protocol = window.location.protocol.includes('https') ? 'wss': 'ws'
+const socket = new WebSocket(`${protocol}://${location.host}`);
 
 socket.binaryType = 'arraybuffer'
 
