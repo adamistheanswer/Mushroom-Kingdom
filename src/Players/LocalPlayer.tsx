@@ -12,6 +12,7 @@ import useUserStore from '../State/userStore'
 import { NamePlate } from './NamePlate'
 import throttle from 'lodash/throttle'
 import { encode } from '@msgpack/msgpack'
+import { useIsTyping } from '../Utils/useIsTyping'
 
 function arrIdentical(a1, a2) {
    let i = a1.length
@@ -42,6 +43,9 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
    const joystickControls = useJoystickControls(isTabletOrMobile)
+
+   const disableControls = useIsTyping()
+
    const keyboardControls = useKeyboardControls()
 
    const sendClientUpdate = useCallback(
@@ -54,7 +58,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const updatePlayer = useCallback(
       (state) => {
          const group = groupRef.current
-
+         const isTyping = disableControls.current
          const { forwardJoy, backwardJoy, leftJoy, rightJoy } = joystickControls.current
          const { forward, backward, left, right, dance1, dance2, excited, punch, salute, wave } =
             keyboardControls.current
@@ -62,35 +66,35 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          if (group && state.controls && state.camera) {
             const azimuthAngle = Number(state.controls.getAzimuthalAngle().toFixed(2))
             let actionsArray: string[] = []
-            if (forward || forwardJoy !== 0) {
+            if ((!isTyping && forward) || forwardJoy !== 0) {
                tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
 
                actionsArray.push('Walking')
                group.position.addScaledVector(tempVector, velocity)
             }
 
-            if (backward || backwardJoy !== 0) {
+            if ((!isTyping && backward) || backwardJoy !== 0) {
                tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
 
                actionsArray.push('WalkingB')
                group.position.addScaledVector(tempVector, velocity)
             }
 
-            if (left || leftJoy !== 0) {
+            if ((!isTyping && left) || leftJoy !== 0) {
                tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
 
                group.position.addScaledVector(tempVector, velocity)
-               if (backward || backwardJoy !== 0) {
+               if ((!isTyping && backward) || backwardJoy !== 0) {
                   actionsArray.push('StrafeRight')
                } else {
                   actionsArray.push('StrafeLeft')
                }
             }
 
-            if (right || rightJoy !== 0) {
+            if ((!isTyping && right) || rightJoy !== 0) {
                tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
                group.position.addScaledVector(tempVector, velocity)
-               if (backward || backwardJoy !== 0) {
+               if ((!isTyping && backward) || backwardJoy !== 0) {
                   actionsArray.push('StrafeLeft')
                } else {
                   actionsArray.push('StrafeRight')
@@ -149,7 +153,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
                   payload: {
                      rotation: groupRef.current?.rotation.toArray().slice(0, -1),
                      position: groupRef.current?.position,
-                     action: actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3',
+                     action: isTyping ? '3' : actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3',
                   },
                })
          }
@@ -163,7 +167,13 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    return (
       <group ref={groupRef}>
-         <NamePlate key={localClientId} position={groupRef.current?.position} clientId={localClientId} isLocal={true} />
+         <NamePlate
+            key={localClientId}
+            position={groupRef.current?.position}
+            clientId={localClientId}
+            isLocal={true}
+            socket={clientSocket}
+         />
          <Avatar
             position={groupRef.current?.position}
             rotation={groupRef.current?.rotation}

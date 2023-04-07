@@ -15,10 +15,9 @@ interface AvatarProps {
 }
 
 interface WebSocketMessage {
-   type: string;
-   payload: any;
- }
-
+   type: string
+   payload: any
+}
 
 type GLTFResult = GLTF & {
    nodes: {
@@ -66,7 +65,7 @@ export const Avatar = React.memo<AvatarProps>(
 
       useEffect(() => {
          const handleAnimations = (event) => {
-            const message = decode(new Uint8Array(event.data)) as WebSocketMessage;
+            const message = decode(new Uint8Array(event.data)) as WebSocketMessage
             if (message.type === 'clientUpdates') {
                const updatedClients = message.payload
                setCurrentAction(updatedClients[clientId].action)
@@ -128,8 +127,11 @@ export const Avatar = React.memo<AvatarProps>(
                   castShadow
                   receiveShadow
                   name="Circle001"
+                  //@ts-ignore
                   geometry={nodes.Circle001.geometry}
+                  //@ts-ignore
                   material={nodes.Circle001.material}
+                  //@ts-ignore
                   skeleton={nodes.Circle001.skeleton}
                />
             </group>

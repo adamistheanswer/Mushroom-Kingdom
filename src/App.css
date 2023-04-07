@@ -101,3 +101,9 @@ body {
       transform: rotate(360deg);
    }
 }
+
+.nipple.collection_0 .back {
+   background-color: rgba(0, 50, 0, 1d) !important;
+   border: 2px solid darkgreen !important;
+   border-radius: 50% !important;
+ }
