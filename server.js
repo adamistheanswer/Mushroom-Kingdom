@@ -104,6 +104,7 @@ wsServer.on('connection', (socket) => {
       position: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
       action: '3',
+      userName: '',
    })
 
    if (largeScenery.length === 0) {
@@ -137,11 +138,18 @@ wsServer.on('connection', (socket) => {
       const message = decode(data)
       if (message.type === 'move') {
          const { rotation, position, action } = message.payload
-         console.log(message.payload)
+         // console.log(message.payload)
          if (clients.get(clientId)) {
             clients.get(clientId).position = position
             clients.get(clientId).rotation = rotation
             clients.get(clientId).action = action
+         }
+      }
+      if (message.type === 'setUserName') {
+         const userName = message.payload
+         console.log(userName)
+         if (clients.get(clientId)) {
+            clients.get(clientId).userName = userName
          }
       }
    })
@@ -174,11 +182,11 @@ wsServer.on('connection', (socket) => {
    })
 })
 
-const updateInterval = setInterval(sendClientUpdates, 100);
+const updateInterval = setInterval(sendClientUpdates, 100)
 
 process.on('SIGTERM', () => {
-   clearInterval(updateInterval);
- });
+   clearInterval(updateInterval)
+})
 
 httpServer.listen(process.env.PORT || 8080, () => {
    console.log(`Listening on port http://localhost:8080...`)

@@ -8,20 +8,19 @@ import Loader from './Components/Loader'
 import RemotePlayers from './Players/RemotePlayers'
 import LocalPlayer from './Players/LocalPlayer'
 import useUserStore from './State/userStore'
-import { decode } from '@msgpack/msgpack'
+import { decode, encode } from '@msgpack/msgpack'
+import UserNameForm from './Components/UserNameForm'
+import PopoutMenu from './Components/PopoutMenu'
 
-// const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-// const socket = new WebSocket(`${protocol}//${window.location.hostname}:8080`);
-
-const protocol = window.location.protocol.includes('https') ? 'wss': 'ws'
-const socket = new WebSocket(`${protocol}://${location.host}`);
+const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
+const socket = new WebSocket(`${protocol}://${location.host}`)
 
 socket.binaryType = 'arraybuffer'
 
 interface WebSocketMessage {
-   type: string;
-   payload: any;
- }
+   type: string
+   payload: any
+}
 
 const App: React.FC = () => {
    const [largeScenery, setLargeScenery] = useState([])
@@ -29,9 +28,10 @@ const App: React.FC = () => {
 
    const setClientId = useUserStore((state) => state.setClientId)
 
+
    useEffect(() => {
       socket.addEventListener('message', (event) => {
-         const message = decode(new Uint8Array(event.data)) as WebSocketMessage;
+         const message = decode(new Uint8Array(event.data)) as WebSocketMessage
 
          if (message.type === 'largeScenery') {
             setLargeScenery(message.payload)
@@ -60,7 +60,6 @@ const App: React.FC = () => {
          <Canvas shadows>
             <Stats />
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
-
             <color attach="background" args={['black']} />
             <fog attach="fog" color="black" near={50} far={300} />
             <Lighting />
@@ -71,6 +70,8 @@ const App: React.FC = () => {
                <Forest largeScenery={largeScenery} smallScenery={smallScenery} />
             </Suspense>
          </Canvas>
+         <UserNameForm socket={socket}  />
+         <PopoutMenu/>
       </div>
    )
 }

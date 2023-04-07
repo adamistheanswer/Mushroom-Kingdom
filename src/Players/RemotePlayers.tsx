@@ -64,7 +64,7 @@ const RemotePlayers = ({ clientSocket }) => {
       const rotation = new Euler(data.rotation[0], data.rotation[1], data.rotation[2])
       return (
          <>
-            <NamePlate key={clientId} position={position} clientId={clientId} isLocal={false} />
+            <NamePlate key={clientId} position={position} clientId={clientId} socket={clientSocket} isLocal={false} />
             <Avatar
                key={clientId}
                position={position}
