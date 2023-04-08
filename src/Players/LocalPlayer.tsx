@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo } from 'react'
+import React, { useRef, useEffect, useCallback, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Vector3, Euler, Group } from 'three'
@@ -13,6 +13,8 @@ import { NamePlate } from './NamePlate'
 import throttle from 'lodash/throttle'
 import { encode } from '@msgpack/msgpack'
 import { useIsTyping } from '../Utils/useIsTyping'
+import { usePlayerPositionsStore } from '../State/playerPositionsStore'
+import { isColliding } from '../Utils/isColliding'
 
 function arrIdentical(a1, a2) {
    let i = a1.length
@@ -26,11 +28,15 @@ function arrIdentical(a1, a2) {
 const LocalPlayerWrapper = ({ clientSocket }) => {
    const localClientId = useUserStore((state) => state.localClientId)
 
+   const playerPositions = useRef(usePlayerPositionsStore.getState().playerPositions)
+
+   useEffect(() => usePlayerPositionsStore.subscribe((state) => (playerPositions.current = state.playerPositions)), [])
+
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
    const groupRef = useRef<Group>(null!)
    const playerAction = useRef('3')
-   const velocity = 0.6
+   const velocity = 25
 
    const lastHeading = useRef(0)
    const lastAction = useRef('3')
@@ -56,7 +62,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    )
 
    const updatePlayer = useCallback(
-      (state) => {
+      (state, delta) => {
          const group = groupRef.current
          const isTyping = disableControls.current
          const { forwardJoy, backwardJoy, leftJoy, rightJoy } = joystickControls.current
@@ -68,22 +74,28 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             let actionsArray: string[] = []
             if ((!isTyping && forward) || forwardJoy !== 0) {
                tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
-
+               const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
+               if (!isColliding(newPosition, playerPositions.current, 5)) {
+                  group.position.copy(newPosition)
+               }
                actionsArray.push('Walking')
-               group.position.addScaledVector(tempVector, velocity)
             }
 
             if ((!isTyping && backward) || backwardJoy !== 0) {
                tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
-
+               const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
+               if (!isColliding(newPosition, playerPositions.current, 5)) {
+                  group.position.copy(newPosition)
+               }
                actionsArray.push('WalkingB')
-               group.position.addScaledVector(tempVector, velocity)
             }
 
             if ((!isTyping && left) || leftJoy !== 0) {
                tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-
-               group.position.addScaledVector(tempVector, velocity)
+               const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
+               if (!isColliding(newPosition, playerPositions.current, 5)) {
+                  group.position.copy(newPosition)
+               }
                if ((!isTyping && backward) || backwardJoy !== 0) {
                   actionsArray.push('StrafeRight')
                } else {
@@ -93,7 +105,10 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
             if ((!isTyping && right) || rightJoy !== 0) {
                tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-               group.position.addScaledVector(tempVector, velocity)
+               const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
+               if (!isColliding(newPosition, playerPositions.current, 5)) {
+                  group.position.copy(newPosition)
+               }
                if ((!isTyping && backward) || backwardJoy !== 0) {
                   actionsArray.push('StrafeLeft')
                } else {
@@ -161,8 +176,8 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
       [groupRef, orbitRef, camRef, velocity, playerAction, clientSocket]
    )
 
-   useFrame((state) => {
-      updatePlayer(state)
+   useFrame((state, delta) => {
+      updatePlayer(state, delta)
    })
 
    return (
