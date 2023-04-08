@@ -1,6 +1,6 @@
 import React, { useEffect, Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { PerspectiveCamera, Stats } from '@react-three/drei'
+import { PerspectiveCamera, Stats, useProgress } from '@react-three/drei'
 import Lighting from './Environment/Lighting'
 import Ground from './Environment/Ground'
 import Forest from './Environment/Forest'
@@ -8,7 +8,7 @@ import Loader from './Components/Loader'
 import RemotePlayers from './Players/RemotePlayers'
 import LocalPlayer from './Players/LocalPlayer'
 import useUserStore from './State/userStore'
-import { decode, encode } from '@msgpack/msgpack'
+import { decode } from '@msgpack/msgpack'
 import UserNameForm from './Components/UserNameForm'
 import PopoutMenu from './Components/PopoutMenu'
 
@@ -27,7 +27,6 @@ const App: React.FC = () => {
    const [smallScenery, setSmallScenery] = useState([])
 
    const setClientId = useUserStore((state) => state.setClientId)
-
 
    useEffect(() => {
       socket.addEventListener('message', (event) => {
@@ -55,10 +54,12 @@ const App: React.FC = () => {
       }
    }, [])
 
+   const { loaded } = useProgress()
+
    return (
       <div style={{ width: '100%', height: '100vh' }}>
          <Canvas shadows>
-            <Stats />
+            {/* <Stats /> */}
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
             <color attach="background" args={['black']} />
             <fog attach="fog" color="black" near={50} far={300} />
@@ -70,8 +71,12 @@ const App: React.FC = () => {
                <Forest largeScenery={largeScenery} smallScenery={smallScenery} />
             </Suspense>
          </Canvas>
-         <UserNameForm socket={socket}  />
-         <PopoutMenu/>
+         {loaded >= 25 && (
+            <>
+               <UserNameForm socket={socket} />
+               <PopoutMenu socket={socket} />
+            </>
+         )}
       </div>
    )
 }

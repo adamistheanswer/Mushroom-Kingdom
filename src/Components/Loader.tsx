@@ -1,13 +1,98 @@
 import React from 'react'
 import { useProgress, Html } from '@react-three/drei'
+import styled, { keyframes } from 'styled-components'
+
+const spin = keyframes`
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+`
+
+const LoaderWrapper = styled.div`
+   position: relative;
+   left: 50%;
+   top: 50%;
+   width: 150px;
+   height: 150px;
+   margin: 0 0 0 -75px;
+   border-radius: 50%;
+   border: 3px solid transparent;
+   border-top-color: #fff;
+   animation: ${spin} 2s linear infinite;
+   z-index: 1000;
+
+   &:before,
+   &:after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      border-top-color: #fff;
+   }
+
+   &:before {
+      top: 5px;
+      left: 5px;
+      right: 5px;
+      bottom: 5px;
+      animation: ${spin} 3s linear infinite;
+   }
+
+   &:after {
+      top: 15px;
+      left: 15px;
+      right: 15px;
+      bottom: 15px;
+      animation: ${spin} 1.5s linear infinite;
+   }
+`
+
+const Mushroom = styled.span`
+   font-size: ${({ size }) => size || '50px'};
+   animation-name: ${({ animation }) => animation};
+   animation-duration: ${({ duration }) => duration || '3s'};
+   animation-iteration-count: infinite;
+   animation-direction: ${({ direction }) => direction || 'normal'};
+`
+
+const Logo = styled.div`
+   position: absolute;
+   top: 50%;
+   left: 50%;
+   margin-top: -35px;
+   margin-left: -35px;
+   width: 100px;
+   height: 100px;
+`
+
+const LoadingText = styled.div`
+   padding-top: 20px;
+   font-weight: bold;
+   color: #fff;
+   text-align: center;
+   width: 500px;
+`
 
 export default function Loader() {
    const { item } = useProgress()
 
    return (
       <Html center>
-         <div id="loader" />
-         <div id="logo">
+         <LoaderWrapper>
+            <Mushroom className="mushroom" animation="rotate">
+               🍄
+            </Mushroom>
+            <Mushroom className="mushroom mushroom-2" size="40px" animation="bounce" duration="4s">
+               🍄
+            </Mushroom>
+            <Mushroom className="mushroom mushroom-3" size="30px" animation="rotate" duration="2s" direction="reverse">
+               🍄
+            </Mushroom>
+         </LoaderWrapper>
+         <Logo>
             <svg
                id="Layer_1"
                height="36"
@@ -26,8 +111,8 @@ export default function Loader() {
                   transform="translate(-11.57 -11.57)"
                />
             </svg>
-         </div>
-         <div id="loadingText">loading File - {item}</div>
+         </Logo>
+         <LoadingText>loading File - {item}</LoadingText>
       </Html>
    )
 }

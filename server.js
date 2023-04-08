@@ -152,6 +152,13 @@ wsServer.on('connection', (socket) => {
             clients.get(clientId).userName = userName
          }
       }
+
+      if (message.type === 'playerAction') {
+         const { action } = message.payload
+         if (clients.get(clientId)) {
+            clients.get(clientId).action = action
+         }
+      }
    })
 
    setInterval(sendClientUpdates, 40)
