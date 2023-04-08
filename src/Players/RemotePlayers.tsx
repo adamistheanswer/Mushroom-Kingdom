@@ -4,6 +4,7 @@ import useUserStore from '../State/userStore'
 import { Euler, Vector3 } from 'three'
 import { NamePlate } from './NamePlate'
 import { decode } from '@msgpack/msgpack'
+import { usePlayerPositionsStore } from '../State/playerPositionsStore'
 
 interface WebSocketMessage {
    type: string
@@ -19,32 +20,20 @@ function mapsEqual(a, b) {
 }
 
 const RemotePlayers = ({ clientSocket }) => {
-   const [playerPositions, setPlayerPositions] = useState(new Map())
    const localClientId = useUserStore((state) => state.localClientId)
+   const playerPositions = usePlayerPositionsStore((state) => state.playerPositions)
+   const updatePlayerPositions = usePlayerPositionsStore((state) => state.updatePlayerPositions)
+   const removeDisconnectedPlayer = usePlayerPositionsStore((state) => state.removeDisconnectedPlayer)
 
    useEffect(() => {
       const handleClientUpdates = (event) => {
          const message = decode(new Uint8Array(event.data)) as WebSocketMessage
          if (message.type === 'clientUpdates') {
             const updatedClients = message.payload
-
-            setPlayerPositions((prevPositions) => {
-               const newPositions = new Map(prevPositions)
-               for (const clientId in updatedClients) {
-                  if (clientId !== localClientId) {
-                     const { position, rotation } = updatedClients[clientId]
-                     newPositions.set(clientId, { position, rotation })
-                  }
-               }
-               return mapsEqual(prevPositions, newPositions) ? prevPositions : newPositions
-            })
+            localClientId && updatePlayerPositions(updatedClients, localClientId)
          } else if (message.type === 'clientDisconnect') {
             const disconnectedClientId = message.payload
-            setPlayerPositions((prevPositions) => {
-               const newPositions = new Map(prevPositions)
-               newPositions.delete(disconnectedClientId)
-               return newPositions
-            })
+            removeDisconnectedPlayer(disconnectedClientId)
          }
       }
 

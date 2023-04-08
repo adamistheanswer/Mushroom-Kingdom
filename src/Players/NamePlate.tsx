@@ -29,7 +29,7 @@ export const NamePlate = React.memo<NamePlateProps>(
             const message = decode(new Uint8Array(event.data)) as WebSocketMessage
             if (message.type === 'clientUpdates') {
                const updatedClients = message.payload
-               setUserName(updatedClients[clientId].userName)
+               updatedClients[clientId]?.userName && setUserName(updatedClients[clientId].userName)
             }
          }
 
