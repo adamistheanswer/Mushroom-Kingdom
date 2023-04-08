@@ -10,6 +10,53 @@ const spin = keyframes`
     transform: rotate(360deg);
   }
 `
+const hueRotate = keyframes`
+0% {
+   filter: hue-rotate(0deg);
+}
+100% {
+   filter: hue-rotate(360deg);
+}
+`
+
+const PsychedelicBG = styled.div`
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-image: radial-gradient(circle, #f06, #f93, #9f3, #6cf, #c6f, #f6f, #fc9, #cf9, #9cf, #06f, #60f, #c0f);
+animation: ${hueRotate} 10s linear infinite;
+z-index: 0;
+}
+`
+
+const psychedelicText = keyframes`
+  0% {
+    text-shadow: 0 0 2px #ff0000, 0 0 4px #ff0000, 0 0 6px #ff0000, 0 0 8px #ff0000, 0 0 10px #ff0000, 0 0 12px #ff0000;
+  }
+  14% {
+    text-shadow: 0 0 2px #ff7f00, 0 0 4px #ff7f00, 0 0 6px #ff7f00, 0 0 8px #ff7f00, 0 0 10px #ff7f00, 0 0 12px #ff7f00;
+  }
+  28% {
+    text-shadow: 0 0 2px #ffff00, 0 0 4px #ffff00, 0 0 6px #ffff00, 0 0 8px #ffff00, 0 0 10px #ffff00, 0 0 12px #ffff00;
+  }
+  42% {
+    text-shadow: 0 0 2px #00ff00, 0 0 4px #00ff00, 0 0 6px #00ff00, 0 0 8px #00ff00, 0 0 10px #00ff00, 0 0 12px #00ff00;
+  }
+  57% {
+    text-shadow: 0 0 2px #0000ff, 0 0 4px #0000ff, 0 0 6px #0000ff, 0 0 8px #0000ff, 0 0 10px #0000ff, 0 0 12px #0000ff;
+  }
+  71% {
+    text-shadow: 0 0 2px #4b0082, 0 0 4px #4b0082, 0 0 6px #4b0082, 0 0 8px #4b0082, 0 0 10px #4b0082, 0 0 12px #4b0082;
+  }
+  85% {
+    text-shadow: 0 0 2px #8b00ff, 0 0 4px #8b00ff, 0 0 6px #8b00ff, 0 0 8px #8b00ff, 0 0 10px #8b00ff, 0 0 12px #8b00ff;
+  }
+  100% {
+    text-shadow: 0 0 2px #ff0000, 0 0 4px #ff0000, 0 0 6px #ff0000, 0 0 8px #ff0000, 0 0 10px #ff0000, 0 0 12px #ff0000;
+  }
+`
 
 const LoaderWrapper = styled.div`
    position: relative;
@@ -22,7 +69,8 @@ const LoaderWrapper = styled.div`
    border: 3px solid transparent;
    border-top-color: #fff;
    animation: ${spin} 2s linear infinite;
-   z-index: 1000;
+   z-index: 1;
+   margin-top: -80px;
 
    &:before,
    &:after {
@@ -50,48 +98,47 @@ const LoaderWrapper = styled.div`
    }
 `
 
-const Mushroom = styled.span`
-   font-size: ${({ size }) => size || '50px'};
-   animation-name: ${({ animation }) => animation};
-   animation-duration: ${({ duration }) => duration || '3s'};
-   animation-iteration-count: infinite;
-   animation-direction: ${({ direction }) => direction || 'normal'};
-`
-
 const Logo = styled.div`
    position: absolute;
    top: 50%;
    left: 50%;
-   margin-top: -35px;
+   margin-top: -20px;
    margin-left: -35px;
    width: 100px;
    height: 100px;
 `
 
 const LoadingText = styled.div`
+   position: relative;
+   left: calc(50% - 250px);
+   top: 50%;
    padding-top: 20px;
    font-weight: bold;
    color: #fff;
    text-align: center;
    width: 500px;
+   z-index: 1001;
+   animation: ${psychedelicText} 10s linear infinite;
 `
+
+function getFileName(item) {
+   if (!item) return ''
+
+   const pathParts = item.split('/')
+   const fileNameWithExt = pathParts[pathParts.length - 1]
+   const fileName = fileNameWithExt.split('.').slice(0, -1).join('.')
+
+   if (!fileName) return 'Stream Data'
+   return fileName
+}
 
 export default function Loader() {
    const { item } = useProgress()
 
    return (
-      <Html center>
-         <LoaderWrapper>
-            <Mushroom className="mushroom" animation="rotate">
-               🍄
-            </Mushroom>
-            <Mushroom className="mushroom mushroom-2" size="40px" animation="bounce" duration="4s">
-               🍄
-            </Mushroom>
-            <Mushroom className="mushroom mushroom-3" size="30px" animation="rotate" duration="2s" direction="reverse">
-               🍄
-            </Mushroom>
-         </LoaderWrapper>
+      <Html fullscreen>
+         <PsychedelicBG />
+         <LoaderWrapper />
          <Logo>
             <svg
                id="Layer_1"
@@ -112,7 +159,7 @@ export default function Loader() {
                />
             </svg>
          </Logo>
-         <LoadingText>loading File - {item}</LoadingText>
+         <LoadingText>loading File - {getFileName(item)}</LoadingText>
       </Html>
    )
 }
