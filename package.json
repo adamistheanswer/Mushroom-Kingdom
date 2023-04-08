@@ -32,15 +32,15 @@
       "prettier": "2.8.7",
       "react": "18.2.0",
       "react-dom": "18.2.0",
-      "styled-components": "5.3.9",
+      "styled-components": "^5.3.9",
       "vite-plugin-babel-macros": "1.0.6"
-   },
-   "peerDependencies": {
-      "three": ">=0.137"
    },
    "engines": {
       "node": "16.17.0"
    },
+   "resolutions": {
+      "three": "0.150.1"
+    },
    "optionalDependencies": {
       "bufferutil": "4.0.7",
       "utf-8-validate": "6.0.3"
