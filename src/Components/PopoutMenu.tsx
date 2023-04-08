@@ -10,64 +10,33 @@ interface PopoutMenuProps {
    socket: WebSocket
 }
 
-function menuIndexToText(index) {
-   switch (index) {
-      case 0:
-         return 'Whomp'
-      case 1:
-         return 'Wiggle'
-      case 2:
-         return 'Shimmy'
-      case 3:
-         return 'Punch'
-      case 4:
-         return 'Salute'
-      case 5:
-         return 'Wave'
-      default:
-         'Idle'
-   }
-   return 'Idle'
+const menuTextLookup = {
+   0: 'Whomp',
+   1: 'Wiggle',
+   2: 'Shimmy',
+   3: 'Punch',
+   4: 'Salute',
+   5: 'Wave',
 }
 
-function menuIndexToEmoji(index) {
-    switch (index) {
-       case 0:
-          return '👊'; // Whomp
-       case 1:
-          return '🕺'; // Wiggle
-       case 2:
-          return '💃'; // Shimmy
-       case 3:
-          return '🥊'; // Punch
-       case 4:
-          return '🖖'; // Salute
-       case 5:
-          return '👋'; // Wave
-       default:
-          return '😐'; // Idle
-    }
+const menuEmojiLookup = {
+   0: '👊', // Whomp
+   1: '🕺', // Wiggle
+   2: '💃', // Shimmy
+   3: '🥊', // Punch
+   4: '🖖', // Salute
+   5: '👋', // Wave
+   default: '😐', // Idle
 }
-function playerActionsToAnimationIndex(action) {
-   switch (action) {
-      case 'Whomp':
-         return '0'
-      case 'Wiggle':
-         return '1'
-      case 'Shimmy':
-         return '2'
-      case 'Punch':
-         return '4'
-      case 'Salute':
-         return '5'
-      case 'Wave':
-         return '10'
-      case 'stop':
-         return '3'
-      default:
-         '3'
-   }
-   return '3'
+
+const playerActionsLookup = {
+   Whomp: '0',
+   Wiggle: '1',
+   Shimmy: '2',
+   Punch: '4',
+   Salute: '5',
+   Wave: '10',
+   stop: '3',
 }
 
 const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
@@ -131,22 +100,21 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
       ...(menuOpen ? openMenuStyle : closedMenuStyle),
    }
 
-
-   
    const itemButtonStyle = {
-    backgroundColor: 'rgba(0, 50, 0, 0.5)',
-    border: '2px solid darkgreen',
-    borderRadius: '50%',
-    color: 'white',
-    cursor: 'pointer',
-    fontSize: '24px', // Increase the font size for larger emoji icons
-    width: '50px',
-    height: '50px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: '0.3s',
- };
+      backgroundColor: 'rgba(0, 50, 0, 0.5)',
+      border: '2px solid darkgreen',
+      borderRadius: '50%',
+      color: 'white',
+      cursor: 'pointer',
+      fontSize: '24px', // Increase the font size for larger emoji icons
+      width: '50px',
+      height: '50px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: '0.3s',
+      userSelect: 'none',
+   }
 
    const handleButtonAction = (action: string) => {
       const message: WebSocketMessage = {
@@ -184,10 +152,10 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
                   style={itemButtonStyle}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 50, 0, 0.8)')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 50, 0, 0.5)')}
-                  onMouseDown={() => handleButtonAction(playerActionsToAnimationIndex(menuIndexToText(i)))}
-                  onMouseUp={() => handleButtonAction('3')}
+                  onMouseDown={() => handleButtonAction(playerActionsLookup[menuTextLookup[i] || 'default'])}
+                  onMouseUp={() => handleButtonAction(playerActionsLookup['stop'])}
                >
-                  {menuIndexToEmoji(i)}
+                  {menuEmojiLookup[i] || menuEmojiLookup.default}
                </button>
             ))}
          </div>
