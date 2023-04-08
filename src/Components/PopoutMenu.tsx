@@ -20,7 +20,7 @@ const menuTextLookup = {
 }
 
 const menuEmojiLookup = {
-   0: '👊', // Whomp
+   0: '🤘', // Whomp
    1: '🕺', // Wiggle
    2: '💃', // Shimmy
    3: '🥊', // Punch
@@ -149,11 +149,14 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
             {Array.from({ length: 6 }, (_, i) => (
                <button
                   key={i}
+                  //@ts-ignore
                   style={itemButtonStyle}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 50, 0, 0.8)')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 50, 0, 0.5)')}
                   onMouseDown={() => handleButtonAction(playerActionsLookup[menuTextLookup[i] || 'default'])}
                   onMouseUp={() => handleButtonAction(playerActionsLookup['stop'])}
+                  onTouchStart={() => handleButtonAction(playerActionsLookup[menuTextLookup[i] || 'default'])}
+                  onTouchEnd={() => handleButtonAction(playerActionsLookup['stop'])}
                >
                   {menuEmojiLookup[i] || menuEmojiLookup.default}
                </button>
