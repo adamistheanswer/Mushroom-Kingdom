@@ -20,15 +20,14 @@ const hueRotate = keyframes`
 `
 
 const PsychedelicBG = styled.div`
-position: absolute;
-top: 0;
-left: 0;
-width: 100%;
-height: 100%;
-background-image: radial-gradient(circle, #f06, #f93, #9f3, #6cf, #c6f, #f6f, #fc9, #cf9, #9cf, #06f, #60f, #c0f);
-animation: ${hueRotate} 10s linear infinite;
-z-index: 0;
-}
+   position: absolute;
+   top: 0;
+   left: 0;
+   width: 100%;
+   height: 100%;
+   background-image: radial-gradient(circle, #f06, #f93, #9f3, #6cf, #c6f, #f6f, #fc9, #cf9, #9cf, #06f, #60f, #c0f);
+   animation: ${hueRotate} 10s linear infinite;
+   z-index: 0;
 `
 
 const psychedelicText = keyframes`
