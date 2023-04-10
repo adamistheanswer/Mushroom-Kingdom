@@ -11,6 +11,11 @@ export function isColliding(localPosition, remotePositions, radius = 1) {
    const radiusSquared = radius * radius * 4
 
    for (const [, data] of remotePositions.entries()) {
+      const isInSpawnArea =
+         data.position.x >= -7 && data.position.x <= 7 && data.position.z >= -7 && data.position.z <= 7
+      if (isInSpawnArea) {
+         return false
+      }
       remoteVector.set(data.position.x + offset, data.position.y, data.position.z + offset)
       const distanceSquared = localVector.distanceToSquared(remoteVector)
       if (distanceSquared < radiusSquared) {

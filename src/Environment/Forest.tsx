@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { Vector3 } from 'three'
 import { useFBX } from '@react-three/drei'
+import useSceneryStore from '../State/SceneryStore'
 
 const modelUrlMap = {
    0: '../Models/Forest/BirchTree_1.fbx',
@@ -47,7 +48,10 @@ const useFBXHandler = (url, scale) => {
    return clonedModel
 }
 
-const Forest = ({ largeScenery, smallScenery }) => {
+const Forest = () => {
+   const largeScenery = useSceneryStore((state) => state.largeScenery)
+   const smallScenery = useSceneryStore((state) => state.smallScenery)
+
    const cachedModels = useMemo(() => {
       const models = {}
       Object.values(modelUrlMap).forEach((url) => {
@@ -62,14 +66,21 @@ const Forest = ({ largeScenery, smallScenery }) => {
       return models
    }, [])
 
-
    function createObjects(sceneryData) {
       return sceneryData.map((entity) => {
          const idx = entity[0]
          if (sceneryData.length === 400) idx + 13
          const pos = new Vector3(entity[1], 0, entity[2])
          const modelUrl = modelUrlMap[idx]
-         return <primitive rotation={[0,entity[4],0]} scale={entity[3]} key={entity.toString()} position={pos} object={cachedModels[modelUrl].clone()} />
+         return (
+            <primitive
+               rotation={[0, entity[4], 0]}
+               scale={entity[3]}
+               key={entity.toString()}
+               position={pos}
+               object={cachedModels[modelUrl].clone()}
+            />
+         )
       })
    }
 

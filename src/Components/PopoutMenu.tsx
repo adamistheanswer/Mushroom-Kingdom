@@ -118,7 +118,7 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
 
    const handleButtonAction = (action: string) => {
       const message: WebSocketMessage = {
-         type: 'playerAction',
+         type: 'state_set_client_action',
          payload: {
             action: action,
          },

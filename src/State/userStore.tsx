@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 interface UserStoreState {
-   localClientId: string | null
+   localClientId: string
 }
 
 interface UserStoreActions {
@@ -11,7 +11,7 @@ interface UserStoreActions {
 type UserStore = UserStoreState & UserStoreActions
 
 const useUserStore = create<UserStore>((set) => ({
-   localClientId: null,
+   localClientId: '',
    setClientId: (id) =>
       set(() => ({
          localClientId: id,

@@ -17,7 +17,7 @@ const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
       setUserName(event.target.value)
 
       const message: WebSocketMessage = {
-         type: 'setUserName',
+         type: 'state_set_username',
          payload: event.target.value,
       }
 

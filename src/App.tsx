@@ -1,6 +1,6 @@
 import React, { useEffect, Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { PerspectiveCamera, Stats, useProgress } from '@react-three/drei'
+import { PerspectiveCamera, Stats } from '@react-three/drei'
 import Lighting from './Environment/Lighting'
 import Ground from './Environment/Ground'
 import Forest from './Environment/Forest'
@@ -9,8 +9,9 @@ import RemotePlayers from './Players/RemotePlayers'
 import LocalPlayer from './Players/LocalPlayer'
 import useUserStore from './State/userStore'
 import { decode } from '@msgpack/msgpack'
-import UserNameForm from './Components/UserNameForm'
-import PopoutMenu from './Components/PopoutMenu'
+import { PlayerAudioConnection } from './Components/PlayerAudioConnection'
+import OverlayUIWrapper from './Components/OverlayUIWrapper'
+import useSceneryStore from './State/SceneryStore'
 
 const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
 const socket = new WebSocket(`${protocol}://${location.host}`)
@@ -23,10 +24,9 @@ interface WebSocketMessage {
 }
 
 const App: React.FC = () => {
-   const [largeScenery, setLargeScenery] = useState([])
-   const [smallScenery, setSmallScenery] = useState([])
-
    const setClientId = useUserStore((state) => state.setClientId)
+   const setLargeScenery = useSceneryStore((state) => state.setLargeScenery)
+   const setSmallScenery = useSceneryStore((state) => state.setSmallScenery)
 
    useEffect(() => {
       socket.addEventListener('message', (event) => {
@@ -54,8 +54,6 @@ const App: React.FC = () => {
       }
    }, [])
 
-   const { loaded } = useProgress()
-
    return (
       <div style={{ width: '100%', height: '100vh' }}>
          <Canvas shadows>
@@ -68,15 +66,12 @@ const App: React.FC = () => {
                <RemotePlayers clientSocket={socket} />
                <LocalPlayer clientSocket={socket} />
                <Ground />
-               <Forest largeScenery={largeScenery} smallScenery={smallScenery} />
+               <Forest />
             </Suspense>
          </Canvas>
-         {loaded >= 25 && (
-            <>
-               <UserNameForm socket={socket} />
-               <PopoutMenu socket={socket} />
-            </>
-         )}
+
+         <OverlayUIWrapper socket={socket} />
+         <PlayerAudioConnection socket={socket} />
       </div>
    )
 }
