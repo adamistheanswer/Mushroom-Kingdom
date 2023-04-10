@@ -164,7 +164,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
             !noChange &&
                sendClientUpdate({
-                  type: 'move',
+                  type: 'state_set_client_move',
                   payload: {
                      rotation: groupRef.current?.rotation.toArray().slice(0, -1),
                      position: groupRef.current?.position,

@@ -12,7 +12,6 @@ import { decode } from '@msgpack/msgpack'
 import { PlayerAudioConnection } from './Components/PlayerAudioConnection'
 import OverlayUIWrapper from './Components/OverlayUIWrapper'
 import useSceneryStore from './State/SceneryStore'
-import useClientsStore from './State/clientsStore'
 
 const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
 const socket = new WebSocket(`${protocol}://${location.host}`)

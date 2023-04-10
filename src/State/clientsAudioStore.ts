@@ -12,7 +12,7 @@ type ClientsStore = {
    updateVoiceChatStatus: (clientId: string, voiceChatEnabled: boolean) => void
 }
 
-export const useClientsStore = create<ClientsStore>((set, get) => ({
+export const useClientAudioStore = create<ClientsStore>((set, get) => ({
    clients: {},
    removeClient: (clientId) => {
       set((state) => {
@@ -35,4 +35,4 @@ export const useClientsStore = create<ClientsStore>((set, get) => ({
    },
 }))
 
-export default useClientsStore
+export default useClientAudioStore
