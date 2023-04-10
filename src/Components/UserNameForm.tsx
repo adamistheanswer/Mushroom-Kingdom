@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { encode } from '@msgpack/msgpack'
 
 interface WebSocketMessage {
@@ -12,6 +12,18 @@ interface UserNameFormProps {
 
 const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
    const [userName, setUserName] = useState('')
+   const [isMobile, setIsMobile] = useState(window.innerWidth <= 480)
+
+   useEffect(() => {
+      const handleResize = () => {
+         setIsMobile(window.innerWidth <= 480)
+      }
+
+      window.addEventListener('resize', handleResize)
+      return () => {
+         window.removeEventListener('resize', handleResize)
+      }
+   }, [])
 
    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       setUserName(event.target.value)
@@ -30,9 +42,9 @@ const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
       alignItems: 'center',
       justifyContent: 'center',
       position: 'absolute',
-      top: '10px',
-      left: '50%',
-      transform: 'translateX(-50%)',
+      top: isMobile ? '23px' : '10px',
+      left: isMobile ? '20px' : '50%',
+      transform: isMobile ? 'none' : 'translateX(-50%)',
       zIndex: 100,
    }
 
