@@ -4,7 +4,7 @@ import { broadcastClientVoiceChatStatusUpdate } from './broadcastHandler.js'
 export function handleStateSetVoiceChatStatus(message) {
    const { voiceChatEnabled, clientId } = message.payload
    const clientData = getClient(clientId)
-   clientData.voiceChatEnabled = voiceChatEnabled
+   clientData.microphone = voiceChatEnabled
    setClient(clientId, clientData)
    broadcastClientVoiceChatStatusUpdate(clientId, voiceChatEnabled)
 }
