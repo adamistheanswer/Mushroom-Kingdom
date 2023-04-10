@@ -34,12 +34,10 @@ const pulseAnimation = {
 export function PlayerAudioConnection({ socket }) {
    const [voiceChatEnabled, setVoiceChatEnabled] = useState(false)
    const localClientId = useUserStore((state) => state.localClientId)
-   const clients = useClientAudioStore((state) => state.clients)
    const removeClient = useClientAudioStore((state) => state.removeClient)
    const setClients = useClientAudioStore((state) => state.setClients)
    const updateVoiceChatStatus = useClientAudioStore((state) => state.updateVoiceChatStatus)
-   const { startVoiceChat } = useVoiceChat(socket, localClientId, clients)
-   console.log('Player Audio Clients:', clients)
+   const { startVoiceChat } = useVoiceChat(socket, localClientId)
 
    useEffect(() => {
       socket.addEventListener('message', handleMessage)

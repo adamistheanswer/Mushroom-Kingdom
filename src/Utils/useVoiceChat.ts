@@ -1,37 +1,27 @@
 import { decode, encode } from '@msgpack/msgpack'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SimplePeer from 'simple-peer'
+import useClientAudioStore from '../State/clientsAudioStore'
 
 interface WebSocketMessage {
    type: string
    payload: any
 }
-const iceServers = {
-   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }],
-}
 
-export const useVoiceChat = (socket, clientId, clients) => {
+export const useVoiceChat = (socket, clientId) => {
    const peersRef = useRef({})
+   const audioElementsRef = useRef({})
+   const [remoteAudioMuted, setRemoteAudioMuted] = useState({})
    const [voiceChatEnabled, setVoiceChatEnabled] = useState(false)
-   const userAudioStreamRef = useRef<MediaStream | null>(null)
 
-   console.log(peersRef.current)
+   const clients = useClientAudioStore((state) => state.clients)
 
-   useEffect(() => {
-      if (!voiceChatEnabled) {
-         if (userAudioStreamRef.current) {
-            userAudioStreamRef.current.getAudioTracks().forEach((track) => {
-               track.enabled = false
-            })
-         }
-      } else {
-         if (userAudioStreamRef.current) {
-            userAudioStreamRef.current.getAudioTracks().forEach((track) => {
-               track.enabled = true
-            })
-         }
-      }
-   }, [voiceChatEnabled])
+   const iceServers = useMemo(
+      () => ({
+         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }],
+      }),
+      []
+   )
 
    useEffect(() => {
       if (!socket || !clientId) return
@@ -42,10 +32,10 @@ export const useVoiceChat = (socket, clientId, clients) => {
             const { senderId, signal } = message.payload
             if (senderId === clientId) return
 
-            console.log(`Received signal from ${senderId}`, signal)
+            const initiator = clientId > senderId
 
             if (!peersRef.current[senderId]) {
-               createPeerConnection(senderId, true)
+               createPeerConnection(senderId, initiator)
             }
 
             peersRef.current[senderId].signal(signal)
@@ -72,7 +62,6 @@ export const useVoiceChat = (socket, clientId, clients) => {
          peer.on('error', (err) => console.error('Error in peer connection:', err))
 
          peer.on('signal', (signal) => {
-            console.log(`Sending signal to ${targetId}`, signal)
             const message = {
                type: 'signal',
                payload: { targetId, senderId: clientId, signal },
@@ -87,9 +76,10 @@ export const useVoiceChat = (socket, clientId, clients) => {
             track.onunmute = () => {
                const audio = new Audio()
                audio.autoplay = true
-               audio.muted = false
+               audio.muted = remoteAudioMuted[targetId]
                audio.srcObject = stream
                audio.play()
+               audioElementsRef.current[targetId] = audio
             }
          })
 
@@ -97,12 +87,16 @@ export const useVoiceChat = (socket, clientId, clients) => {
             console.log(`Disconnected from ${targetId}`)
             peer.destroy()
             delete peersRef.current[targetId]
+            if (audioElementsRef.current[targetId]) {
+               audioElementsRef.current[targetId].pause()
+               audioElementsRef.current[targetId].srcObject = null
+               delete audioElementsRef.current[targetId]
+            }
          })
 
          navigator.mediaDevices
             .getUserMedia({ audio: true })
             .then((stream) => {
-               userAudioStreamRef.current = stream
                if (!peer.destroyed) {
                   peer.addStream(stream)
                }
@@ -113,8 +107,46 @@ export const useVoiceChat = (socket, clientId, clients) => {
 
          peersRef.current[targetId] = peer
       },
-      [clientId, socket]
+      [clientId, socket, clients, remoteAudioMuted]
    )
+
+   useEffect(() => {
+      return () => {
+         for (const id in audioElementsRef.current) {
+            if (audioElementsRef.current[id]) {
+               audioElementsRef.current[id].pause()
+               audioElementsRef.current[id].srcObject = null
+            }
+         }
+      }
+   }, [])
+
+   useEffect(() => {
+      const updatedRemoteAudioMuted = {}
+      for (const id in clients) {
+         if (id !== clientId) {
+            updatedRemoteAudioMuted[id] = !clients[id]?.microphone
+         }
+      }
+      setRemoteAudioMuted(updatedRemoteAudioMuted)
+   }, [clientId, clients])
+
+   useEffect(() => {
+      for (const id in peersRef.current) {
+         const peer = peersRef.current[id]
+         if (peer && peer.streams && peer.streams[0]) {
+            const audioTracks = peer.streams[0].getAudioTracks()
+            if (audioTracks.length > 0) {
+               audioTracks[0].enabled = !remoteAudioMuted[id]
+            }
+         }
+
+         const audioElement = audioElementsRef.current[id]
+         if (audioElement) {
+            audioElement.muted = remoteAudioMuted[id] || !clients[id]?.microphone
+         }
+      }
+   }, [remoteAudioMuted, clients])
 
    const startVoiceChat = useCallback(() => {
       if (!clientId || voiceChatEnabled) return
@@ -122,7 +154,6 @@ export const useVoiceChat = (socket, clientId, clients) => {
 
       for (const id in clients) {
          if (id !== clientId) {
-            // Only the client with the higher clientId will initiate the connection.
             const shouldInitiateConnection = clientId > id
             createPeerConnection(id, shouldInitiateConnection)
          }

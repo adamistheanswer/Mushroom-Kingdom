@@ -2,14 +2,14 @@
 import { create } from 'zustand'
 
 type ClientData = {
-   voiceChatEnabled: boolean
+   microphone: boolean
 }
 
 type ClientsStore = {
    clients: { [key: string]: ClientData }
    removeClient: (clientId: string) => void
    setClients: (activeClients: { [key: string]: ClientData }) => void
-   updateVoiceChatStatus: (clientId: string, voiceChatEnabled: boolean) => void
+   updateVoiceChatStatus: (clientId: string, microphone: boolean) => void
 }
 
 export const useClientAudioStore = create<ClientsStore>((set, get) => ({
@@ -24,11 +24,11 @@ export const useClientAudioStore = create<ClientsStore>((set, get) => ({
    setClients: (activeClients) => {
       set({ clients: { ...activeClients } })
    },
-   updateVoiceChatStatus: (clientId, voiceChatEnabled) => {
+   updateVoiceChatStatus: (clientId, microphone) => {
       set((state) => {
          const updatedClients = { ...state.clients }
          if (updatedClients[clientId]) {
-            updatedClients[clientId].voiceChatEnabled = voiceChatEnabled
+            updatedClients[clientId].microphone = microphone
          }
          return { clients: updatedClients }
       })

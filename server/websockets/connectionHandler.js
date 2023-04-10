@@ -28,7 +28,7 @@ export function handleConnection(socket) {
       rotation: { x: 0, y: 0, z: 0 },
       action: '3',
       userName: '',
-      voiceChatEnabled: false,
+      microphone: false,
       joined: Date.now().toString(),
    })
 
