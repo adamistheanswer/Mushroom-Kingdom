@@ -1,6 +1,6 @@
 import { Vector3 } from 'three'
 
-export function isColliding(localPosition, remotePositions, radius = 1) {
+export function isColliding(localPosition, remotePositions, direction, radius = 1) {
    const isInSpawnArea = localPosition.x >= -7 && localPosition.x <= 7 && localPosition.z >= -7 && localPosition.z <= 7
    if (isInSpawnArea) {
       return false
@@ -17,6 +17,14 @@ export function isColliding(localPosition, remotePositions, radius = 1) {
          return false
       }
       remoteVector.set(data.position.x + offset, data.position.y, data.position.z + offset)
+
+      const directionVector = remoteVector.clone().sub(localVector).normalize()
+      const dotProduct = directionVector.dot(direction)
+
+      if (dotProduct <= 0) {
+         continue
+      }
+
       const distanceSquared = localVector.distanceToSquared(remoteVector)
       if (distanceSquared < radiusSquared) {
          return true
