@@ -166,7 +166,10 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
                sendClientUpdate({
                   type: 'state_set_client_move',
                   payload: {
-                     rotation: groupRef.current?.rotation.toArray().slice(0, -1),
+                     rotation: groupRef.current?.rotation
+                        .toArray()
+                        .slice(0, -1)
+                        .map((value) => Number((value as number).toFixed(2))),
                      position: groupRef.current?.position,
                      action: isTyping ? '3' : actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3',
                   },
@@ -206,6 +209,9 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             rotateSpeed={0.4}
             maxPolarAngle={Math.PI / 2}
             makeDefault
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onPointerMove={(e) => e.stopPropagation()}
          />
       </group>
    )
