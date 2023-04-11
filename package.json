@@ -10,6 +10,7 @@
       "@msgpack/msgpack": "^3.0.0-beta2",
       "express": "4.18.2",
       "express-promise-router": "4.1.1",
+      "immer": "^9.0.21",
       "lodash": "^4.17.21",
       "msgpack5": "^6.0.2",
       "nipplejs": "0.10.1",

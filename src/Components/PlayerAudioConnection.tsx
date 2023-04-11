@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, CSSProperties } from 'react'
 import useUserStore from '../State/userStore'
 import useClientAudioStore from '../State/clientsAudioStore'
 import { WebSocketMessage } from '../Interfaces/websockets'
 import { decode, encode } from '@msgpack/msgpack'
 import { useVoiceChat } from '../Utils/useVoiceChat'
 
-const containerStyle = {
+const containerStyle: CSSProperties = {
    position: 'fixed',
    right: '20px',
    top: '20px',

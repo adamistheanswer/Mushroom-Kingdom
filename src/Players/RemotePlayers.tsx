@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { Avatar } from './Avatar'
 import useUserStore from '../State/userStore'
 import { Euler, Vector3 } from 'three'
@@ -11,14 +11,6 @@ interface WebSocketMessage {
    payload: any
 }
 
-function mapsEqual(a, b) {
-   if (a.size !== b.size) return false
-   for (const [key, value] of a.entries()) {
-      if (!b.has(key) || b.get(key) !== value) return false
-   }
-   return true
-}
-
 const RemotePlayers = ({ clientSocket }) => {
    const localClientId = useUserStore((state) => state.localClientId)
    const playerPositions = usePlayerPositionsStore((state) => state.playerPositions)
@@ -27,13 +19,12 @@ const RemotePlayers = ({ clientSocket }) => {
 
    useEffect(() => {
       const handleClientUpdates = (event) => {
-         const message = decode(new Uint8Array(event.data)) as WebSocketMessage
-         if (message.type === 'clientUpdates') {
-            const updatedClients = message.payload
-            localClientId && updatePlayerPositions(updatedClients, localClientId)
-         } else if (message.type === 'clientDisconnect') {
-            const disconnectedClientId = message.payload
-            removeDisconnectedPlayer(disconnectedClientId)
+         const message = decode(event.data) as WebSocketMessage
+         switch (message.type) {
+            case 'clientUpdates':
+               localClientId && updatePlayerPositions(message.payload, localClientId)
+            case 'clientDisconnect':
+               removeDisconnectedPlayer(message.payload)
          }
       }
 
