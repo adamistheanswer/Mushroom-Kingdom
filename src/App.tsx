@@ -30,7 +30,7 @@ const App: React.FC = () => {
 
    useEffect(() => {
       socket.addEventListener('message', (event) => {
-         const message = decode(new Uint8Array(event.data)) as WebSocketMessage
+         const message = decode(event.data) as WebSocketMessage
 
          if (message.type === 'largeScenery') {
             setLargeScenery(message.payload)
