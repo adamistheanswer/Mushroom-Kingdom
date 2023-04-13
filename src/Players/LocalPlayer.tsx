@@ -16,31 +16,27 @@ import { useIsTyping } from '../Utils/useIsTyping'
 import { usePlayerPositionsStore } from '../State/playerPositionsStore'
 import { isColliding } from '../Utils/isColliding'
 
-function arrIdentical(a1, a2) {
-   let i = a1.length
-   if (i != a2.length) return false
-   while (i--) {
-      if (a1[i] !== a2[i]) return false
+function arraysEqual(a: any[], b: any[]): boolean {
+   if (a.length !== b.length) return false
+   for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false
    }
    return true
 }
 
 const LocalPlayerWrapper = ({ clientSocket }) => {
    const localClientId = useUserStore((state) => state.localClientId)
-
+   const arraysEqualMemo = useMemo(() => arraysEqual, [])
    const playerPositions = useRef(usePlayerPositionsStore.getState().playerPositions)
 
    useEffect(() => usePlayerPositionsStore.subscribe((state) => (playerPositions.current = state.playerPositions)), [])
 
+   const lastSentState = useRef<{ rotation: number[]; position: number[]; action: string } | null>(null)
+
    const orbitRef = useRef<OrbitControlsImpl>(null)
    const camRef = useRef<any>()
    const groupRef = useRef<Group>(null!)
-   const playerAction = useRef('3')
    const velocity = 25
-
-   const lastHeading = useRef(0)
-   const lastAction = useRef('3')
-   const lastPosition = useRef([0, 0, 0])
 
    const tempVector = useMemo(() => new Vector3(), [])
    const cameraOffset = useMemo(() => new Vector3(), [])
@@ -57,7 +53,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const sendClientUpdate = useCallback(
       throttle((data) => {
          clientSocket.send(encode(data))
-      }, 20),
+      }, 30),
       [clientSocket]
    )
 
@@ -122,11 +118,6 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             state.camera.position.add(cameraOffset)
             group.setRotationFromEuler(tempEuler.set(0, azimuthAngle, 0, 'XYZ'))
 
-            let meshPositionArr = group.position.toArray()
-            meshPositionArr[0] = Math.round(meshPositionArr[0] * 100) / 100
-            meshPositionArr[1] = 0
-            meshPositionArr[2] = Math.round(meshPositionArr[2] * 100) / 100
-
             if (dance1) actionsArray.push('Dance')
             if (dance2) actionsArray.push('Dance2')
             if (excited) actionsArray.push('Excited')
@@ -134,49 +125,50 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             if (salute) actionsArray.push('Salute')
             if (wave) actionsArray.push('Waving')
 
-            let isPlayerStationary = arrIdentical(lastPosition.current, meshPositionArr)
-            let isPlayerRotationChanged = lastHeading.current !== azimuthAngle
-
-            if (
-               !isPlayerRotationChanged &&
-               isPlayerStationary &&
-               !dance1 &&
-               !dance2 &&
-               !excited &&
-               !punch &&
-               !salute &&
-               !wave
-            ) {
+            if (!dance1 && !dance2 && !excited && !punch && !salute && !wave) {
                actionsArray.push('Idle')
             }
 
-            let actionsArrayString = actionsArray.toString()
+            const currentRotation = groupRef.current?.rotation
+               .toArray()
+               .slice(0, -1)
+               .map((value) => Number((value as number).toFixed(2)))
 
-            const noChange = !isPlayerRotationChanged && isPlayerStationary && lastAction.current === actionsArrayString
+            const currentPosition = groupRef.current?.position
+               .toArray()
+               .map((value) => Number((value as number).toFixed(2)))
 
-            if (isPlayerRotationChanged) lastHeading.current = azimuthAngle
+            const currentAction = isTyping
+               ? '3'
+               : actionsArray.length
+               ? playerActionsToIndexes(actionsArray).join()
+               : '3'
 
-            if (lastAction.current !== actionsArrayString) lastAction.current = actionsArrayString
+            const currentState = {
+               rotation: currentRotation,
+               position: currentPosition,
+               action: currentAction,
+            }
 
-            if (!isPlayerStationary) lastPosition.current = meshPositionArr
-
-            playerAction.current = actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3'
-
-            !noChange &&
+            if (
+               !lastSentState.current ||
+               !arraysEqualMemo(currentState.rotation, lastSentState.current.rotation) ||
+               !arraysEqualMemo(currentState.position, lastSentState.current.position) ||
+               currentAction !== lastSentState.current.action
+            ) {
                sendClientUpdate({
-                  type: 'state_set_client_move',
+                  type: 'move',
                   payload: {
-                     rotation: groupRef.current?.rotation
-                        .toArray()
-                        .slice(0, -1)
-                        .map((value) => Number((value as number).toFixed(2))),
-                     position: groupRef.current?.position,
-                     action: isTyping ? '3' : actionsArray.length ? playerActionsToIndexes(actionsArray).join() : '3',
+                     rotation: currentState.rotation,
+                     position: currentState.position,
+                     action: currentState.action,
                   },
                })
+               lastSentState.current = currentState
+            }
          }
       },
-      [groupRef, orbitRef, camRef, velocity, playerAction, clientSocket]
+      [groupRef, orbitRef, camRef, velocity, clientSocket]
    )
 
    useFrame((state, delta) => {
