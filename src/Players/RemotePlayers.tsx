@@ -22,7 +22,6 @@ const RemotePlayers = ({ clientSocket }) => {
          const message = decode(event.data) as WebSocketMessage
          switch (message.type) {
             case 'clientUpdates':
-               console.log('clientUpdates', message.payload)
                localClientId && updatePlayerPositions(message.payload, localClientId)
                break
             case 'clientDisconnect':

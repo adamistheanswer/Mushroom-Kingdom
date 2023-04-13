@@ -19,7 +19,6 @@ export function broadcastClientUpdates() {
       type: 'clientUpdates',
       payload: getAllClients(),
    }
-   console.log(JSON.stringify(response))
    const encodedResponse = encode(response)
    wsServer.clients.forEach((client) => {
       client.send(encodedResponse)
