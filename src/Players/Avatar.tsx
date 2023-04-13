@@ -65,7 +65,7 @@ export const Avatar = React.memo<AvatarProps>(
 
       useEffect(() => {
          const handleAnimations = (event) => {
-            const message = decode(new Uint8Array(event.data)) as WebSocketMessage
+            const message = decode(event.data) as WebSocketMessage
             if (message.type === 'clientUpdates') {
                const updatedClients = message.payload
                updatedClients[clientId]?.action && setCurrentAction(updatedClients[clientId].action)
