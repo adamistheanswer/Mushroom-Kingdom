@@ -15,7 +15,7 @@ import { handleSignalMessage } from './signalHandler.js'
 
 const STATE_SET_USERNAME = 'state_set_username'
 const STATE_SET_CLIENT_ACTION = 'state_set_client_action'
-const STATE_SET_CLIENT_MOVEMENT = 'state_set_client_move'
+const STATE_SET_CLIENT_MOVEMENT = 'move'
 const STATE_SET_VOICE_CHAT_STATUS = 'state_set_client_voice_chat_status'
 
 export function handleConnection(socket) {
@@ -24,12 +24,11 @@ export function handleConnection(socket) {
    console.log(`User ${clientId} connected - ${getClientsAsMap().size + 1} active users`)
 
    setClient(clientId, {
-      position: { x: 0, y: 0, z: 0 },
-      rotation: { x: 0, y: 0, z: 0 },
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
       action: '3',
       userName: '',
       microphone: false,
-      joined: Date.now().toString(),
    })
 
    sendClientId(socket, clientId)

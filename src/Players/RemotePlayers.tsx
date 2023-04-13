@@ -23,8 +23,10 @@ const RemotePlayers = ({ clientSocket }) => {
          switch (message.type) {
             case 'clientUpdates':
                localClientId && updatePlayerPositions(message.payload, localClientId)
+               break
             case 'clientDisconnect':
                removeDisconnectedPlayer(message.payload)
+               break
          }
       }
 
@@ -40,7 +42,7 @@ const RemotePlayers = ({ clientSocket }) => {
    }, [clientSocket])
 
    const remotePlayerModels = Array.from(playerPositions.entries()).map(([clientId, data]) => {
-      const position = new Vector3(data.position.x, data.position.y, data.position.z)
+      const position = new Vector3(data.position[0], data.position[1], data.position[2])
       const rotation = new Euler(data.rotation[0], data.rotation[1], data.rotation[2])
       return (
          <>
@@ -56,7 +58,7 @@ const RemotePlayers = ({ clientSocket }) => {
       )
    })
 
-   return <>{remotePlayerModels.flat()}</>
+   return <>{remotePlayerModels}</>
 }
 
 export default RemotePlayers
