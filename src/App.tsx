@@ -14,7 +14,7 @@ import OverlayUIWrapper from './Components/OverlayUIWrapper'
 import useSceneryStore from './State/SceneryStore'
 
 const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
-const socket = new WebSocket(`${protocol}://${location.host}`)
+const socket = new WebSocket(`${protocol}://${location.host}:7070`)
 
 socket.binaryType = 'arraybuffer'
 

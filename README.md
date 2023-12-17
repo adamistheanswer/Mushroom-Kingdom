@@ -23,6 +23,7 @@ npm i
 ## Usage
 
 ```bash
+npm run build
 npm run dev
 ```
 
@@ -39,7 +40,6 @@ Suggestions with improving the server and moving from Socket.io would be much ap
 
 [MIT](https://choosealicense.com/licenses/mit/)
 
-## 3D Assets 
+## 3D Assets
 
 [Nature Pack](https://quaternius.com/)
-
