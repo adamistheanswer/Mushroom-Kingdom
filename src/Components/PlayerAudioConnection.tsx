@@ -36,6 +36,7 @@ export function PlayerAudioConnection({ socket }) {
    const localClientId = useUserStore((state) => state.localClientId)
    const removeClient = useClientAudioStore((state) => state.removeClient)
    const setClients = useClientAudioStore((state) => state.setClients)
+   const updateClientsFromDeltas = useClientAudioStore((state) => state.updateClientsFromDeltas)
    const updateVoiceChatStatus = useClientAudioStore((state) => state.updateVoiceChatStatus)
    const { startVoiceChat, stopVoiceChat } = useVoiceChat(socket, localClientId)
 
@@ -44,7 +45,7 @@ export function PlayerAudioConnection({ socket }) {
       return () => {
          socket.removeEventListener('message', handleMessage)
       }
-   }, [socket])
+   }, [removeClient, setClients, socket, updateClientsFromDeltas, updateVoiceChatStatus])
 
    function handleMessage(event) {
       const message = decode(event.data) as WebSocketMessage
@@ -52,6 +53,11 @@ export function PlayerAudioConnection({ socket }) {
       switch (message.type) {
          case 'activeClients':
             setClients(message.payload)
+            break
+         case 'clientUpdates':
+            if (Array.isArray(message.payload)) {
+               updateClientsFromDeltas(message.payload)
+            }
             break
          case 'clientDisconnect':
             removeClient(message.payload)
@@ -66,22 +72,33 @@ export function PlayerAudioConnection({ socket }) {
    async function toggleVoiceChat() {
       if (voiceChatEnabled) {
          stopVoiceChat()
+         updateVoiceChatStatus(localClientId, false)
          sendVoiceChatStatus(false)
          setVoiceChatEnabled(false)
          return
       }
 
+      if (!localClientId || socket.readyState !== WebSocket.OPEN) {
+         return
+      }
+
       try {
          await startVoiceChat()
+         updateVoiceChatStatus(localClientId, true)
          sendVoiceChatStatus(true)
          setVoiceChatEnabled(true)
       } catch {
+         updateVoiceChatStatus(localClientId, false)
          sendVoiceChatStatus(false)
          setVoiceChatEnabled(false)
       }
    }
 
    function sendVoiceChatStatus(enabled) {
+      if (!localClientId || socket.readyState !== WebSocket.OPEN) {
+         return
+      }
+
       const message: WebSocketMessage = {
          type: 'state_set_client_voice_chat_status',
          payload: {

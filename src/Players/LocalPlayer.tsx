@@ -14,6 +14,11 @@ import { encode } from '@msgpack/msgpack'
 import { useIsTyping } from '../Utils/useIsTyping'
 import { usePlayerPositionsStore } from '../State/playerPositionsStore'
 import { isColliding } from '../Utils/isColliding'
+import useClientAudioStore from '../State/clientsAudioStore'
+import usePlayerActionStore from '../State/playerActionStore'
+
+const LOCAL_CHILD_POSITION = new Vector3(0, 0, 0)
+const LOCAL_CHILD_ROTATION = new Euler(0, 0, 0)
 
 function arraysEqual(a: any[], b: any[]): boolean {
    if (a.length !== b.length) return false
@@ -25,6 +30,10 @@ function arraysEqual(a: any[], b: any[]): boolean {
 
 const LocalPlayerWrapper = ({ clientSocket }) => {
    const localClientId = useUserStore((state) => state.localClientId)
+   const localVoiceState = useClientAudioStore((state) =>
+      localClientId ? state.clients[localClientId] : { microphone: false, speaking: false }
+   )
+   const selectedMenuAction = usePlayerActionStore((state) => state.selectedMenuAction)
    const arraysEqualMemo = useMemo(() => arraysEqual, [])
    const playerPositions = useRef(usePlayerPositionsStore.getState().playerPositions)
 
@@ -48,16 +57,33 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    const keyboardControls = useKeyboardControls()
 
-   const sendClientUpdate = useCallback(
-      throttle((data) => {
-         if (clientSocket.readyState !== WebSocket.OPEN || clientSocket.bufferedAmount > 128 * 1024) {
-            return
-         }
+   const sendClientUpdate = useMemo(
+      () =>
+         throttle((currentState) => {
+            if (clientSocket.readyState !== WebSocket.OPEN || clientSocket.bufferedAmount > 128 * 1024) {
+               return
+            }
 
-         clientSocket.send(encode(data))
-      }, 30),
+            clientSocket.send(
+               encode({
+                  type: 'move',
+                  payload: {
+                     rotation: currentState.rotation,
+                     position: currentState.position,
+                     action: currentState.action,
+                  },
+               })
+            )
+            lastSentState.current = currentState
+         }, 30),
       [clientSocket]
    )
+
+   useEffect(() => {
+      return () => {
+         sendClientUpdate.cancel()
+      }
+   }, [sendClientUpdate])
 
    const updatePlayer = useCallback(
       (state, delta) => {
@@ -68,7 +94,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             keyboardControls.current
 
          if (group && state.controls && state.camera) {
-            const azimuthAngle = Number(state.controls.getAzimuthalAngle().toFixed(2))
+            const azimuthAngle = state.controls.getAzimuthalAngle()
             let actionsArray: string[] = []
             if ((!isTyping && forward) || forwardJoy !== 0) {
                tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
@@ -131,10 +157,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
                actionsArray.push('Idle')
             }
 
-            const currentRotation = groupRef.current?.rotation
-               .toArray()
-               .slice(0, -1)
-               .map((value) => Number((value as number).toFixed(2)))
+            const currentRotation = [0, Number(azimuthAngle.toFixed(4)), 0]
 
             const currentPosition = groupRef.current?.position
                .toArray()
@@ -142,9 +165,11 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
             const currentAction = isTyping
                ? '3'
-               : actionsArray.length
-                 ? playerActionsToIndexes(actionsArray).join()
-                 : '3'
+               : selectedMenuAction
+                 ? selectedMenuAction
+                 : actionsArray.length
+                   ? playerActionsToIndexes(actionsArray).join()
+                   : '3'
 
             const currentState = {
                rotation: currentRotation,
@@ -158,19 +183,11 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
                !arraysEqualMemo(currentState.position, lastSentState.current.position) ||
                currentAction !== lastSentState.current.action
             ) {
-               sendClientUpdate({
-                  type: 'move',
-                  payload: {
-                     rotation: currentState.rotation,
-                     position: currentState.position,
-                     action: currentState.action,
-                  },
-               })
-               lastSentState.current = currentState
+               sendClientUpdate(currentState)
             }
          }
       },
-      [groupRef, orbitRef, camRef, velocity, clientSocket]
+      [groupRef, orbitRef, camRef, velocity, clientSocket, selectedMenuAction, sendClientUpdate]
    )
 
    useFrame((state, delta) => {
@@ -181,14 +198,16 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
       <group ref={groupRef}>
          <NamePlate
             key={localClientId}
-            position={groupRef.current?.position}
+            position={LOCAL_CHILD_POSITION}
             clientId={localClientId}
             isLocal={true}
             socket={clientSocket}
+            microphone={localVoiceState?.microphone}
+            speaking={localVoiceState?.speaking}
          />
          <Avatar
-            position={groupRef.current?.position}
-            rotation={groupRef.current?.rotation}
+            position={LOCAL_CHILD_POSITION}
+            rotation={LOCAL_CHILD_ROTATION}
             clientId={localClientId}
             clientSocket={clientSocket}
          />

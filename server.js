@@ -47,7 +47,31 @@ app.use(router)
 const httpServer = http.createServer(app)
 export const wsServer = new WebSocketServer({ server: httpServer })
 
-wsServer.on('connection', handleConnection)
+function markSocketAlive() {
+   this.isAlive = true
+}
+
+wsServer.on('connection', (socket) => {
+   socket.isAlive = true
+   socket.on('pong', markSocketAlive)
+   handleConnection(socket)
+})
+
+const wsHeartbeatInterval = setInterval(() => {
+   wsServer.clients.forEach((socket) => {
+      if (socket.isAlive === false) {
+         socket.terminate()
+         return
+      }
+
+      socket.isAlive = false
+      socket.ping()
+   })
+}, 30000)
+
+wsServer.on('close', () => {
+   clearInterval(wsHeartbeatInterval)
+})
 
 startSendingClientUpdates()
 

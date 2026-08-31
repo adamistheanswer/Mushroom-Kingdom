@@ -33,7 +33,9 @@ const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
          payload: event.target.value,
       }
 
-      socket.send(encode(message))
+      if (socket.readyState === WebSocket.OPEN) {
+         socket.send(encode(message))
+      }
    }
 
    const formStyle = {
