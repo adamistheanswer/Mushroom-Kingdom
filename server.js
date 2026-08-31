@@ -3,18 +3,19 @@ dotenv.config()
 import { WebSocketServer } from 'ws'
 import { handleConnection, startSendingClientUpdates } from './server/websockets/connectionHandler.js'
 import fs from 'fs'
-import Router from 'express-promise-router'
 import viteConfig from './vite.config.js'
 import { createServer } from 'vite'
 import express from 'express'
 import http from 'http'
 
-const router = Router()
+const router = express.Router()
 const app = express()
+let vite
 
 if (process.env.NODE_ENV === 'development') {
-   const vite = await createServer({
+   vite = await createServer({
       configFile: false,
+      appType: 'custom',
       server: {
          middlewareMode: true,
       },
@@ -25,15 +26,19 @@ if (process.env.NODE_ENV === 'development') {
    app.use(express.static('dist'))
 }
 
-router.get('/', async (req, res) => {
-   let html = fs.readFileSync('index.html', 'utf-8')
-   if (process.env.NODE_ENV === 'development') {
-      html = await vite.transformIndexHtml(req.url, html)
+router.get('/', async (req, res, next) => {
+   try {
+      let html = fs.readFileSync('index.html', 'utf-8')
+      if (vite) {
+         html = await vite.transformIndexHtml(req.url, html)
+      }
+      res.send(html)
+   } catch (error) {
+      next(error)
    }
-   res.send(html)
 })
 
-router.use('*', (req, res) => {
+router.use((req, res) => {
    res.status(404).send({ message: 'Not Found' })
 })
 
@@ -47,5 +52,6 @@ wsServer.on('connection', handleConnection)
 startSendingClientUpdates()
 
 httpServer.listen(process.env.PORT || 8080, () => {
-   console.log(`Listening on port http://localhost:8080...`)
+   const port = process.env.PORT || 8080
+   console.log(`Listening on port http://localhost:${port}...`)
 })

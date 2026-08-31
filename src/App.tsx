@@ -12,6 +12,7 @@ import { decode } from '@msgpack/msgpack'
 import { PlayerAudioConnection } from './Components/PlayerAudioConnection'
 import OverlayUIWrapper from './Components/OverlayUIWrapper'
 import useSceneryStore from './State/SceneryStore'
+import { PCFShadowMap } from 'three'
 
 const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
 const socket = new WebSocket(`${protocol}://${location.host}`)
@@ -56,7 +57,7 @@ const App: React.FC = () => {
 
    return (
       <div style={{ width: '100%', height: '100vh' }}>
-         <Canvas shadows>
+         <Canvas shadows={{ type: PCFShadowMap }}>
             {/* <Stats /> */}
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
             <color attach="background" args={['black']} />

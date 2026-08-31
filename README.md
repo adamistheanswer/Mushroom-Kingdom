@@ -1,45 +1,60 @@
 # 🍄 Mushroom Kingdom 🍄
 
-A multiplayer game starter built with React Three Fibre (R3F), Node.js, Socket.io & Vite.
+A multiplayer game starter built with React Three Fiber (R3F), Node.js, WebSockets, and Vite.
 
 Mobile controls using nippleJS and WASD movement controls on desktop.
 
-![React Three Fibre Multiplayer Game](/screenshot.png)
+![React Three Fiber Multiplayer Game](/screenshot.png)
 
 ## Installation
 
--  Create a .env file in the root of the project and populate it with the following for local dev
+- Use Node.js 20.19 or newer.
+- Install dependencies:
 
 ```bash
-ENVIRONMENT=local
-```
-
--  Install
-
-```bash
-npm i
+npm install
 ```
 
 ## Usage
+
+Run the full development app, including the Express/WebSocket server and Vite middleware:
 
 ```bash
 npm run dev
 ```
 
-Server localhost:8080
+Open `http://localhost:8080`.
+
+
+Build production assets:
+
+```bash
+npm run build
+```
+
+Run the production server after a build:
+
+```bash
+npm start
+```
+
+Build and run production locally:
+
+```bash
+npm run preview
+```
 
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first
 to discuss what you would like to change.
 
-Suggestions with improving the server and moving from Socket.io would be much appreciated
+Suggestions for improving the server and WebSocket flow would be much appreciated.
 
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
 
-## 3D Assets 
+## 3D Assets
 
 [Nature Pack](https://quaternius.com/)
-

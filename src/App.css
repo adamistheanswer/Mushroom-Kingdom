@@ -1,9 +1,20 @@
 body {
    margin: 0;
    overflow: hidden;
-   /* Optional: Prevent overscroll effects on iOS */
    -webkit-overflow-scrolling: touch;
    overscroll-behavior: none;
+}
+
+#joystickWrapper1 {
+   position: fixed;
+   right: 0;
+   bottom: 0;
+   width: 220px;
+   height: 220px;
+   z-index: 10;
+   display: none;
+   touch-action: none;
+   user-select: none;
 }
 
 #pingStats {
@@ -15,6 +26,12 @@ body {
    pointer-events: none;
    color: white;
    font-family: monospace;
+}
+
+@media (max-width: 1224px) {
+   #joystickWrapper1 {
+      display: block;
+   }
 }
 
 @media (min-width: 1224px) {
