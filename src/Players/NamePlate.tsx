@@ -9,6 +9,7 @@ interface NamePlateProps {
    isLocal: boolean
    clientId: any
    socket: WebSocket
+   userName?: string
 }
 
 interface WebSocketMessage {
@@ -16,20 +17,32 @@ interface WebSocketMessage {
    payload: any
 }
 
+function getClientUpdate(payload, clientId) {
+   if (Array.isArray(payload)) {
+      return payload.find((client) => client.id === clientId)
+   }
+
+   return payload?.[clientId]
+}
+
 export const NamePlate = React.memo<NamePlateProps>(
-   ({ position = new Vector3(0, 0, 0), isLocal, clientId, socket }) => {
+   ({ position = new Vector3(0, 0, 0), isLocal, clientId, socket, userName }) => {
       const nameplateRef = useRef<THREE.Group>(null!)
       const nameplateHeight = 13
-      const [userName, setUserName] = useState('')
+      const [socketUserName, setSocketUserName] = useState('')
 
       const { camera } = useThree()
 
       useEffect(() => {
+         if (userName !== undefined) {
+            return
+         }
+
          const handleNameplate = (event) => {
             const message = decode(new Uint8Array(event.data)) as WebSocketMessage
             if (message.type === 'clientUpdates') {
-               const updatedClients = message.payload
-               updatedClients[clientId]?.userName && setUserName(updatedClients[clientId].userName)
+               const updatedClient = getClientUpdate(message.payload, clientId)
+               updatedClient?.userName && setSocketUserName(updatedClient.userName)
             }
          }
 
@@ -42,7 +55,7 @@ export const NamePlate = React.memo<NamePlateProps>(
                socket.removeEventListener('message', handleNameplate)
             }
          }
-      }, [socket])
+      }, [clientId, socket, userName])
 
       useFrame(() => {
          if (isLocal) {
@@ -63,7 +76,7 @@ export const NamePlate = React.memo<NamePlateProps>(
 
       return (
          <Text ref={nameplateRef} fontSize={1} color={isLocal ? 'yellow' : 'white'} anchorX="center" anchorY="middle">
-            {userName ? userName : clientId}
+            {userName || socketUserName || clientId}
          </Text>
       )
    }

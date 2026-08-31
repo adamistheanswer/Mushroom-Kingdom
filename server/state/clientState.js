@@ -13,9 +13,13 @@ export function removeClient(clientId) {
 }
 
 export function getAllClients() {
-   return Array.from(clients.entries()).reduce((acc, [key, value]) => {
-      return { ...acc, [key]: value }
-   }, {})
+   const allClients = {}
+
+   for (const [clientId, clientData] of clients.entries()) {
+      allClients[clientId] = clientData
+   }
+
+   return allClients
 }
 
 export function getClientsAsMap() {

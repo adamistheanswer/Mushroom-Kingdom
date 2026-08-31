@@ -12,11 +12,20 @@ interface AvatarProps {
    rotation: Euler
    clientSocket: any
    clientId: any
+   action?: string
 }
 
 interface WebSocketMessage {
    type: string
    payload: any
+}
+
+function getClientUpdate(payload, clientId) {
+   if (Array.isArray(payload)) {
+      return payload.find((client) => client.id === clientId)
+   }
+
+   return payload?.[clientId]
 }
 
 type GLTFResult = GLTF & {
@@ -60,15 +69,25 @@ function useSkinnedMeshClone(path) {
 }
 
 export const Avatar = React.memo<AvatarProps>(
-   ({ position = new Vector3(0, 0, 0), rotation = new Euler(0, 0, 0), clientSocket, clientId }) => {
-      const [currentAction, setCurrentAction] = useState('3')
+   ({ position = new Vector3(0, 0, 0), rotation = new Euler(0, 0, 0), clientSocket, clientId, action }) => {
+      const [currentAction, setCurrentAction] = useState(action ?? '3')
 
       useEffect(() => {
+         if (action !== undefined) {
+            setCurrentAction(action)
+         }
+      }, [action])
+
+      useEffect(() => {
+         if (action !== undefined) {
+            return
+         }
+
          const handleAnimations = (event) => {
             const message = decode(event.data) as WebSocketMessage
             if (message.type === 'clientUpdates') {
-               const updatedClients = message.payload
-               updatedClients[clientId]?.action && setCurrentAction(updatedClients[clientId].action)
+               const updatedClient = getClientUpdate(message.payload, clientId)
+               updatedClient?.action && setCurrentAction(updatedClient.action)
             }
          }
 
@@ -81,7 +100,7 @@ export const Avatar = React.memo<AvatarProps>(
                clientSocket.removeEventListener('message', handleAnimations)
             }
          }
-      }, [clientSocket])
+      }, [action, clientId, clientSocket])
 
       const avatarRef = useRef<Group>(null!)
 

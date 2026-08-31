@@ -4,7 +4,12 @@ import { decode } from '@msgpack/msgpack'
 import { uid } from '../utils/utils.js'
 import { generateLargeScenery, generateSmallScenery } from '../utils/generateScenery.js'
 import { sendClientId, sendLargeScenery, sendSmallScenery } from './InitialisationHander.js'
-import { broadcastClientUpdates, broadcastActiveClients, broardcastClientDisconnect } from './broadcastHandler.js'
+import {
+   broadcastActiveClients,
+   broardcastClientDisconnect,
+   markClientUpdated,
+   broadcastClientUpdates,
+} from './broadcastHandler.js'
 import {
    handleStateSetPlayerAction,
    handleStateSetPlayerMovement,
@@ -30,6 +35,7 @@ export function handleConnection(socket) {
       userName: '',
       microphone: false,
    })
+   markClientUpdated(clientId)
 
    sendClientId(socket, clientId)
    broadcastActiveClients(socket)
@@ -79,7 +85,6 @@ function handleDisconnection(socket, clientId) {
       }
 
       removeClient(clientId)
-      broadcastClientUpdates()
       broardcastClientDisconnect(clientId)
    })
 }

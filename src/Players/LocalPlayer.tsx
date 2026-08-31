@@ -50,6 +50,10 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    const sendClientUpdate = useCallback(
       throttle((data) => {
+         if (clientSocket.readyState !== WebSocket.OPEN || clientSocket.bufferedAmount > 128 * 1024) {
+            return
+         }
+
          clientSocket.send(encode(data))
       }, 30),
       [clientSocket]
@@ -139,8 +143,8 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             const currentAction = isTyping
                ? '3'
                : actionsArray.length
-               ? playerActionsToIndexes(actionsArray).join()
-               : '3'
+                 ? playerActionsToIndexes(actionsArray).join()
+                 : '3'
 
             const currentState = {
                rotation: currentRotation,
