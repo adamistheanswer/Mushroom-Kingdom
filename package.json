@@ -16,7 +16,6 @@
       "@react-three/fiber": "^9.7.0",
       "dotenv": "^17.4.2",
       "express": "^5.2.1",
-      "immer": "^11.1.18",
       "lodash": "^4.18.1",
       "nipplejs": "^1.0.4",
       "react": "^19.2.8",

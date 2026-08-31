@@ -37,7 +37,7 @@ export function PlayerAudioConnection({ socket }) {
    const removeClient = useClientAudioStore((state) => state.removeClient)
    const setClients = useClientAudioStore((state) => state.setClients)
    const updateVoiceChatStatus = useClientAudioStore((state) => state.updateVoiceChatStatus)
-   const { startVoiceChat } = useVoiceChat(socket, localClientId)
+   const { startVoiceChat, stopVoiceChat } = useVoiceChat(socket, localClientId)
 
    useEffect(() => {
       socket.addEventListener('message', handleMessage)
@@ -63,13 +63,22 @@ export function PlayerAudioConnection({ socket }) {
       }
    }
 
-   function toggleVoiceChat() {
-      startVoiceChat()
-      setVoiceChatEnabled((prevEnabled) => {
-         const newEnabled = !prevEnabled
-         sendVoiceChatStatus(newEnabled)
-         return newEnabled
-      })
+   async function toggleVoiceChat() {
+      if (voiceChatEnabled) {
+         stopVoiceChat()
+         sendVoiceChatStatus(false)
+         setVoiceChatEnabled(false)
+         return
+      }
+
+      try {
+         await startVoiceChat()
+         sendVoiceChatStatus(true)
+         setVoiceChatEnabled(true)
+      } catch {
+         sendVoiceChatStatus(false)
+         setVoiceChatEnabled(false)
+      }
    }
 
    function sendVoiceChatStatus(enabled) {

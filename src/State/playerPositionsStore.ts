@@ -1,92 +1,156 @@
-// import { create } from 'zustand'
-
-// export interface PlayerPosition {
-//    position: { x: number; y: number; z: number }
-//    rotation: { x: number; y: number; z: number }
-// }
-
-// export const usePlayerPositionsStore = create<{
-//    playerPositions: Map<string, PlayerPosition>
-//    updatePlayerPositions: (updatedClients: any, localClientId: string) => void
-//    removeDisconnectedPlayer: (disconnectedClientId: string) => void
-// }>((set, get) => ({
-//    playerPositions: new Map(),
-//    removeDisconnectedPlayer: (disconnectedClientId) => {
-//       set((state) => {
-//          const newPositions = new Map(state.playerPositions)
-//          newPositions.delete(disconnectedClientId)
-//          return { playerPositions: newPositions }
-//       })
-//    },
-//    updatePlayerPositions: (updatedClients, localClientId) => {
-//       set((state) => {
-//          const newPositions = new Map(state.playerPositions)
-//          let hasChanged = false
-
-//          for (const clientId in updatedClients) {
-//             if (clientId !== localClientId) {
-//                const { position, rotation } = updatedClients[clientId]
-//                const currentPosition = state.playerPositions.get(clientId)
-//                if (!currentPosition || JSON.stringify(currentPosition) !== JSON.stringify({ position, rotation })) {
-//                   newPositions.set(clientId, { position, rotation })
-//                   hasChanged = true
-//                }
-//             }
-//          }
-
-//          if (!hasChanged) {
-//             return state
-//          }
-
-//          return { playerPositions: newPositions }
-//       })
-//    },
-// }))
-
 import { create } from 'zustand'
-import { immer } from 'zustand/middleware/immer'
-import { enableMapSet } from 'immer'
+import { Euler, Vector3 } from 'three'
 
-export interface PlayerPosition {
-   position: { x: number; y: number; z: number }
-   rotation: { x: number; y: number; z: number }
+export interface PlayerSnapshotData {
+   position: number[]
+   rotation: number[]
+   action?: string
+   userName?: string
+   microphone?: boolean
+}
+
+export interface PlayerPositionUpdate extends PlayerSnapshotData {
+   id: string
+   seq?: number
+   serverTime?: number
+}
+
+export interface RemotePlayerPosition {
+   id: string
+   targetPosition: Vector3
+   targetRotation: Euler
+   action?: string
+   userName?: string
+   microphone?: boolean
+   seq: number
+   serverTime: number
 }
 
 export interface PlayerPositionsStore {
-   playerPositions: Map<string, PlayerPosition>
-   updatePlayerPositions: (updatedClients: Record<string, PlayerPosition>, localClientId: string) => void
+   playerPositions: Map<string, RemotePlayerPosition>
+   updatePlayerPositions: (updatedClients: Record<string, PlayerSnapshotData>, localClientId: string) => void
+   updatePlayerDeltas: (updatedClients: PlayerPositionUpdate[], localClientId: string) => void
    removeDisconnectedPlayer: (clientId: string) => void
-   updateSinglePlayerPosition: (
-      clientId: string,
-      position: { x: number; y: number; z: number },
-      rotation: { x: number; y: number; z: number }
-   ) => void
 }
 
-enableMapSet()
+function playerMetadataChanged(current: RemotePlayerPosition, next: PlayerSnapshotData) {
+   return current.action !== next.action || current.userName !== next.userName || current.microphone !== next.microphone
+}
 
-export const usePlayerPositionsStore = create<PlayerPositionsStore>()(
-   immer((set) => ({
-      playerPositions: new Map(),
-      removeDisconnectedPlayer: (disconnectedClientId) => {
-         set((state) => {
-            state.playerPositions.delete(disconnectedClientId)
-         })
-      },
-      updateSinglePlayerPosition: (clientId, position, rotation) => {
-         set((state) => {
-            state.playerPositions.set(clientId, { position, rotation })
-         })
-      },
-      updatePlayerPositions: (updatedClients, localClientId) => {
-         set((state) => {
-            for (const clientId in updatedClients) {
-               if (clientId !== localClientId) {
-                  const { position, rotation } = updatedClients[clientId]
-                  state.playerPositions.set(clientId, { position, rotation })
-               }
+function updateTargetTransform(player: RemotePlayerPosition, next: PlayerSnapshotData) {
+   if (next.position?.length >= 3) {
+      player.targetPosition.set(next.position[0], next.position[1], next.position[2])
+   }
+
+   if (next.rotation?.length >= 3) {
+      player.targetRotation.set(next.rotation[0], next.rotation[1], next.rotation[2])
+   }
+}
+
+function createRemotePlayer(clientId: string, data: PlayerSnapshotData, seq = 0, serverTime = Date.now()) {
+   return {
+      id: clientId,
+      targetPosition: new Vector3(data.position?.[0] ?? 0, data.position?.[1] ?? 0, data.position?.[2] ?? 0),
+      targetRotation: new Euler(data.rotation?.[0] ?? 0, data.rotation?.[1] ?? 0, data.rotation?.[2] ?? 0),
+      action: data.action,
+      userName: data.userName,
+      microphone: data.microphone,
+      seq,
+      serverTime,
+   }
+}
+
+function updateRemotePlayer(
+   player: RemotePlayerPosition,
+   data: PlayerSnapshotData,
+   seq = player.seq,
+   serverTime = player.serverTime
+) {
+   const shouldPublish = playerMetadataChanged(player, data)
+
+   updateTargetTransform(player, data)
+   player.action = data.action
+   player.userName = data.userName
+   player.microphone = data.microphone
+   player.seq = seq
+   player.serverTime = serverTime
+
+   return shouldPublish
+}
+
+export const usePlayerPositionsStore = create<PlayerPositionsStore>()((set, get) => ({
+   playerPositions: new Map(),
+   removeDisconnectedPlayer: (disconnectedClientId) => {
+      const playerPositions = get().playerPositions
+      if (!playerPositions.has(disconnectedClientId)) {
+         return
+      }
+
+      const nextPlayerPositions = new Map(playerPositions)
+      nextPlayerPositions.delete(disconnectedClientId)
+      set({ playerPositions: nextPlayerPositions })
+   },
+   updatePlayerPositions: (updatedClients, localClientId) => {
+      const playerPositions = get().playerPositions
+      const snapshotClientIds = new Set<string>()
+      let shouldPublish = false
+
+      for (const clientId in updatedClients) {
+         if (clientId === localClientId) {
+            continue
+         }
+
+         snapshotClientIds.add(clientId)
+         const nextClientData = updatedClients[clientId]
+         const currentClientData = playerPositions.get(clientId)
+
+         if (currentClientData) {
+            shouldPublish = updateRemotePlayer(currentClientData, nextClientData) || shouldPublish
+         } else {
+            playerPositions.set(clientId, createRemotePlayer(clientId, nextClientData))
+            shouldPublish = true
+         }
+      }
+
+      for (const clientId of playerPositions.keys()) {
+         if (!snapshotClientIds.has(clientId)) {
+            playerPositions.delete(clientId)
+            shouldPublish = true
+         }
+      }
+
+      if (shouldPublish) {
+         set({ playerPositions: new Map(playerPositions) })
+      }
+   },
+   updatePlayerDeltas: (updatedClients, localClientId) => {
+      const playerPositions = get().playerPositions
+      let shouldPublish = false
+
+      for (const nextClientData of updatedClients) {
+         const clientId = nextClientData.id
+         if (!clientId || clientId === localClientId) {
+            continue
+         }
+
+         const currentClientData = playerPositions.get(clientId)
+         const seq = nextClientData.seq ?? 0
+         const serverTime = nextClientData.serverTime ?? Date.now()
+
+         if (currentClientData) {
+            if (seq > 0 && seq <= currentClientData.seq) {
+               continue
             }
-         })
-      },
-   }))
-)
+
+            shouldPublish = updateRemotePlayer(currentClientData, nextClientData, seq, serverTime) || shouldPublish
+         } else {
+            playerPositions.set(clientId, createRemotePlayer(clientId, nextClientData, seq, serverTime))
+            shouldPublish = true
+         }
+      }
+
+      if (shouldPublish) {
+         set({ playerPositions: new Map(playerPositions) })
+      }
+   },
+}))
