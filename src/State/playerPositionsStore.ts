@@ -43,7 +43,7 @@ function updateTargetTransform(player: RemotePlayerPosition, next: PlayerSnapsho
    }
 
    if (next.rotation?.length >= 3) {
-      player.targetRotation.set(next.rotation[0], next.rotation[1], next.rotation[2])
+      player.targetRotation.set(0, next.rotation[1], 0)
    }
 }
 
@@ -51,7 +51,7 @@ function createRemotePlayer(clientId: string, data: PlayerSnapshotData, seq = 0,
    return {
       id: clientId,
       targetPosition: new Vector3(data.position?.[0] ?? 0, data.position?.[1] ?? 0, data.position?.[2] ?? 0),
-      targetRotation: new Euler(data.rotation?.[0] ?? 0, data.rotation?.[1] ?? 0, data.rotation?.[2] ?? 0),
+      targetRotation: new Euler(0, data.rotation?.[1] ?? 0, 0),
       action: data.action,
       userName: data.userName,
       microphone: data.microphone,

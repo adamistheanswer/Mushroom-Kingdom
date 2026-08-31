@@ -9,6 +9,10 @@ function arraysEqual(a, b) {
    return a.every((value, index) => value === b[index])
 }
 
+function normaliseMovementRotation(rotation) {
+   return [0, Number(rotation?.[1] ?? 0), 0]
+}
+
 export function handleStateSetVoiceChatStatus(message) {
    const { voiceChatEnabled, clientId } = message.payload
    const clientData = getClient(clientId)
@@ -53,18 +57,19 @@ export function handleStateSetPlayerMovement(clientId, message) {
    const { rotation, position, action } = message.payload
    const clientData = getClient(clientId)
    if (!clientData) return
+   const nextRotation = normaliseMovementRotation(rotation)
 
    const unchanged =
       clientData.action === action &&
       arraysEqual(clientData.position, position) &&
-      arraysEqual(clientData.rotation, rotation)
+      arraysEqual(clientData.rotation, nextRotation)
 
    if (unchanged) {
       return
    }
 
    clientData.position = position
-   clientData.rotation = rotation
+   clientData.rotation = nextRotation
    clientData.action = action
    setClient(clientId, clientData)
    markClientUpdated(clientId)

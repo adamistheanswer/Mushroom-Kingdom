@@ -1,5 +1,6 @@
 import { encode } from '@msgpack/msgpack'
 import React, { useState } from 'react'
+import usePlayerActionStore from '../State/playerActionStore'
 
 interface WebSocketMessage {
    type: string
@@ -41,6 +42,8 @@ const playerActionsLookup = {
 
 const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
    const [menuOpen, setMenuOpen] = useState(false)
+   const selectedMenuAction = usePlayerActionStore((state) => state.selectedMenuAction)
+   const setSelectedMenuAction = usePlayerActionStore((state) => state.setSelectedMenuAction)
 
    const toggleMenu = () => {
       setMenuOpen(!menuOpen)
@@ -116,7 +119,7 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
       userSelect: 'none',
    }
 
-   const handleButtonAction = (action: string) => {
+   const sendButtonAction = (action: string) => {
       const message: WebSocketMessage = {
          type: 'state_set_client_action',
          payload: {
@@ -125,7 +128,16 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
       }
 
       const encodedMessage = encode(message)
-      socket.send(encodedMessage)
+      if (socket.readyState === WebSocket.OPEN) {
+         socket.send(encodedMessage)
+      }
+   }
+
+   const handleButtonAction = (action: string) => {
+      const nextAction = selectedMenuAction === action ? null : action
+
+      setSelectedMenuAction(nextAction)
+      sendButtonAction(nextAction ?? playerActionsLookup['stop'])
    }
 
    return (
@@ -146,21 +158,32 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
          </button>
          {/* @ts-ignore */}
          <div style={menuStyle}>
-            {Array.from({ length: 6 }, (_, i) => (
-               <button
-                  key={i}
-                  //@ts-ignore
-                  style={itemButtonStyle}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 50, 0, 0.8)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 50, 0, 0.5)')}
-                  onMouseDown={() => handleButtonAction(playerActionsLookup[menuTextLookup[i] || 'default'])}
-                  onMouseUp={() => handleButtonAction(playerActionsLookup['stop'])}
-                  onTouchStart={() => handleButtonAction(playerActionsLookup[menuTextLookup[i] || 'default'])}
-                  onTouchEnd={() => handleButtonAction(playerActionsLookup['stop'])}
-               >
-                  {menuEmojiLookup[i] || menuEmojiLookup.default}
-               </button>
-            ))}
+            {Array.from({ length: 6 }, (_, i) => {
+               const action = playerActionsLookup[menuTextLookup[i] || 'default']
+               const isSelected = selectedMenuAction === action
+
+               return (
+                  <button
+                     key={i}
+                     //@ts-ignore
+                     style={{
+                        ...itemButtonStyle,
+                        backgroundColor: isSelected ? 'rgba(10, 120, 40, 0.85)' : itemButtonStyle.backgroundColor,
+                        border: isSelected ? '2px solid limegreen' : itemButtonStyle.border,
+                        transform: isSelected ? 'scale(1.08)' : 'scale(1)',
+                     }}
+                     onClick={() => handleButtonAction(action)}
+                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 50, 0, 0.8)')}
+                     onMouseLeave={(e) =>
+                        (e.currentTarget.style.backgroundColor = isSelected
+                           ? 'rgba(10, 120, 40, 0.85)'
+                           : 'rgba(0, 50, 0, 0.5)')
+                     }
+                  >
+                     {menuEmojiLookup[i] || menuEmojiLookup.default}
+                  </button>
+               )
+            })}
          </div>
       </div>
    )

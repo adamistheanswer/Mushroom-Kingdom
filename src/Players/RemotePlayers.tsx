@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { Avatar } from './Avatar'
 import useUserStore from '../State/userStore'
-import { Euler, Group, MathUtils, Vector3 } from 'three'
+import { Euler, Group, Vector3 } from 'three'
 import { NamePlate } from './NamePlate'
 import { decode } from '@msgpack/msgpack'
 import { useFrame } from '@react-three/fiber'
@@ -11,6 +11,7 @@ import {
    RemotePlayerPosition,
    usePlayerPositionsStore,
 } from '../State/playerPositionsStore'
+import useClientAudioStore from '../State/clientsAudioStore'
 
 interface WebSocketMessage {
    type: string
@@ -20,12 +21,6 @@ interface WebSocketMessage {
 const REMOTE_CHILD_POSITION = new Vector3(0, 0, 0)
 const REMOTE_CHILD_ROTATION = new Euler(0, 0, 0)
 const POSITION_LERP_RATE = 16
-const ROTATION_LERP_RATE = 20
-
-function dampAngle(current: number, target: number, lambda: number, delta: number) {
-   const shortestAngle = MathUtils.euclideanModulo(target - current + Math.PI, Math.PI * 2) - Math.PI
-   return current + shortestAngle * (1 - Math.exp(-lambda * delta))
-}
 
 const RemotePlayer = React.memo(
    ({
@@ -33,18 +28,22 @@ const RemotePlayer = React.memo(
       player,
       action,
       userName,
+      microphone,
+      speaking,
    }: {
       clientSocket: WebSocket
       player: RemotePlayerPosition
       action?: string
       userName?: string
+      microphone?: boolean
+      speaking?: boolean
    }) => {
       const positionGroupRef = useRef<Group>(null!)
       const rotationGroupRef = useRef<Group>(null!)
 
       useEffect(() => {
          positionGroupRef.current.position.copy(player.targetPosition)
-         rotationGroupRef.current.rotation.copy(player.targetRotation)
+         rotationGroupRef.current.rotation.set(0, player.targetRotation.y, 0)
       }, [player])
 
       useFrame((_, delta) => {
@@ -56,24 +55,9 @@ const RemotePlayer = React.memo(
          }
 
          positionGroup.position.lerp(player.targetPosition, 1 - Math.exp(-POSITION_LERP_RATE * delta))
-         rotationGroup.rotation.x = MathUtils.damp(
-            rotationGroup.rotation.x,
-            player.targetRotation.x,
-            ROTATION_LERP_RATE,
-            delta
-         )
-         rotationGroup.rotation.y = dampAngle(
-            rotationGroup.rotation.y,
-            player.targetRotation.y,
-            ROTATION_LERP_RATE,
-            delta
-         )
-         rotationGroup.rotation.z = MathUtils.damp(
-            rotationGroup.rotation.z,
-            player.targetRotation.z,
-            ROTATION_LERP_RATE,
-            delta
-         )
+         rotationGroup.rotation.x = 0
+         rotationGroup.rotation.y = player.targetRotation.y
+         rotationGroup.rotation.z = 0
       })
 
       return (
@@ -84,6 +68,8 @@ const RemotePlayer = React.memo(
                socket={clientSocket}
                isLocal={false}
                userName={userName}
+               microphone={microphone}
+               speaking={speaking}
             />
             <group ref={rotationGroupRef}>
                <Avatar
@@ -105,6 +91,7 @@ const RemotePlayers = ({ clientSocket }) => {
    const updatePlayerPositions = usePlayerPositionsStore((state) => state.updatePlayerPositions)
    const updatePlayerDeltas = usePlayerPositionsStore((state) => state.updatePlayerDeltas)
    const removeDisconnectedPlayer = usePlayerPositionsStore((state) => state.removeDisconnectedPlayer)
+   const audioClients = useClientAudioStore((state) => state.clients)
    const pendingActiveClientsRef = useRef<Record<string, PlayerSnapshotData> | null>(null)
    const pendingDeltasRef = useRef<PlayerPositionUpdate[]>([])
 
@@ -173,6 +160,8 @@ const RemotePlayers = ({ clientSocket }) => {
          player={data}
          action={data.action}
          userName={data.userName}
+         microphone={audioClients[clientId]?.microphone ?? data.microphone}
+         speaking={audioClients[clientId]?.speaking}
          clientSocket={clientSocket}
       />
    ))

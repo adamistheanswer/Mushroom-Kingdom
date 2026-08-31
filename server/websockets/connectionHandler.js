@@ -22,6 +22,7 @@ const STATE_SET_USERNAME = 'state_set_username'
 const STATE_SET_CLIENT_ACTION = 'state_set_client_action'
 const STATE_SET_CLIENT_MOVEMENT = 'move'
 const STATE_SET_VOICE_CHAT_STATUS = 'state_set_client_voice_chat_status'
+const HEARTBEAT = 'heartbeat'
 
 export function handleConnection(socket) {
    const clientId = uid()
@@ -68,6 +69,8 @@ export function handleConnection(socket) {
             break
          case 'signal':
             handleSignalMessage(message)
+            break
+         case HEARTBEAT:
             break
       }
    })

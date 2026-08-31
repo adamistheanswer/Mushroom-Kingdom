@@ -11,20 +11,49 @@ interface WebSocketMessage {
 type PeerMap = Record<string, SimplePeer.Instance>
 type AudioElementMap = Record<string, HTMLAudioElement>
 type PendingPeerMap = Record<string, Promise<SimplePeer.Instance | null>>
+type SpeechAnalysisMap = Record<
+   string,
+   {
+      audioContext: AudioContext
+      source: MediaStreamAudioSourceNode
+      animationFrame: number
+      speaking: boolean
+   }
+>
+
+const SIGNAL_BUFFER_LIMIT = 64 * 1024
+const DISCONNECTED_ICE_STATES = new Set(['closed', 'failed'])
+const SPEAKING_THRESHOLD = 0.035
+const SPEAKING_START_DELAY = 80
+const SPEAKING_STOP_DELAY = 240
+
+function preferOpusVoiceSettings(sdp: string) {
+   return sdp.replace(
+      /a=fmtp:111 ([^\r\n]*)/g,
+      (_, params) => `a=fmtp:111 ${params};stereo=0;sprop-stereo=0;maxaveragebitrate=32000;usedtx=1`
+   )
+}
 
 export const useVoiceChat = (socket, clientId) => {
    const peersRef = useRef<PeerMap>({})
    const pendingPeersRef = useRef<PendingPeerMap>({})
    const audioElementsRef = useRef<AudioElementMap>({})
+   const speechAnalysisRef = useRef<SpeechAnalysisMap>({})
    const localStreamRef = useRef<MediaStream | null>(null)
    const voiceChatEnabledRef = useRef(false)
-   const clientsRef = useRef({})
+   const clientsRef = useRef<Record<string, { microphone?: boolean }>>({})
+   const updateSpeakingRef = useRef<(clientId: string, speaking: boolean) => void>(() => {})
 
    const clients = useClientAudioStore((state) => state.clients)
+   const updateClientSpeakingStatus = useClientAudioStore((state) => state.updateClientSpeakingStatus)
 
    useEffect(() => {
       clientsRef.current = clients
    }, [clients])
+
+   useEffect(() => {
+      updateSpeakingRef.current = updateClientSpeakingStatus
+   }, [updateClientSpeakingStatus])
 
    const iceServers = useMemo(
       () => ({
@@ -33,23 +62,113 @@ export const useVoiceChat = (socket, clientId) => {
       []
    )
 
-   const destroyPeer = useCallback((targetId: string) => {
-      const peer = peersRef.current[targetId]
-
-      if (peer && !peer.destroyed) {
-         peer.destroy()
+   const stopSpeakingDetection = useCallback((targetId: string) => {
+      const analysis = speechAnalysisRef.current[targetId]
+      if (!analysis) {
+         return
       }
 
-      delete peersRef.current[targetId]
-
-      const audioElement = audioElementsRef.current[targetId]
-      if (audioElement) {
-         audioElement.pause()
-         audioElement.srcObject = null
-         audioElement.remove()
-         delete audioElementsRef.current[targetId]
-      }
+      cancelAnimationFrame(analysis.animationFrame)
+      analysis.source.disconnect()
+      void analysis.audioContext.close()
+      delete speechAnalysisRef.current[targetId]
+      updateSpeakingRef.current(targetId, false)
    }, [])
+
+   const startSpeakingDetection = useCallback(
+      (targetId: string, stream: MediaStream) => {
+         stopSpeakingDetection(targetId)
+
+         const AudioContextConstructor = window.AudioContext || (window as any).webkitAudioContext
+         if (!AudioContextConstructor) {
+            return
+         }
+
+         const audioContext = new AudioContextConstructor()
+         const source = audioContext.createMediaStreamSource(stream)
+         const analyser = audioContext.createAnalyser()
+         let speaking = false
+         let pendingSpeaking = false
+         let pendingSince = 0
+
+         analyser.fftSize = 512
+         analyser.smoothingTimeConstant = 0.6
+         const samples = new Uint8Array(analyser.fftSize)
+         source.connect(analyser)
+         void audioContext.resume()
+
+         const updateSpeaking = (nextSpeaking: boolean) => {
+            const now = performance.now()
+            const requiredDelay = nextSpeaking ? SPEAKING_START_DELAY : SPEAKING_STOP_DELAY
+
+            if (nextSpeaking !== pendingSpeaking) {
+               pendingSpeaking = nextSpeaking
+               pendingSince = now
+               return
+            }
+
+            if (nextSpeaking !== speaking && now - pendingSince >= requiredDelay) {
+               const analysis = speechAnalysisRef.current[targetId]
+               if (!analysis) {
+                  return
+               }
+
+               speaking = nextSpeaking
+               analysis.speaking = speaking
+               updateSpeakingRef.current(targetId, speaking)
+            }
+         }
+
+         const tick = () => {
+            const analysis = speechAnalysisRef.current[targetId]
+            if (!analysis) {
+               return
+            }
+
+            analyser.getByteTimeDomainData(samples)
+
+            let sum = 0
+            for (let index = 0; index < samples.length; index++) {
+               const value = (samples[index] - 128) / 128
+               sum += value * value
+            }
+
+            updateSpeaking(Math.sqrt(sum / samples.length) > SPEAKING_THRESHOLD)
+            analysis.animationFrame = requestAnimationFrame(tick)
+         }
+
+         speechAnalysisRef.current[targetId] = {
+            audioContext,
+            source,
+            animationFrame: requestAnimationFrame(tick),
+            speaking,
+         }
+      },
+      [stopSpeakingDetection]
+   )
+
+   const destroyPeer = useCallback(
+      (targetId: string) => {
+         const peer = peersRef.current[targetId]
+
+         if (peer && !peer.destroyed) {
+            peer.destroy()
+         }
+
+         delete peersRef.current[targetId]
+
+         const audioElement = audioElementsRef.current[targetId]
+         if (audioElement) {
+            audioElement.pause()
+            audioElement.srcObject = null
+            audioElement.remove()
+            delete audioElementsRef.current[targetId]
+         }
+
+         stopSpeakingDetection(targetId)
+      },
+      [stopSpeakingDetection]
+   )
 
    const stopLocalStream = useCallback(() => {
       localStreamRef.current?.getTracks().forEach((track) => track.stop())
@@ -63,9 +182,12 @@ export const useVoiceChat = (socket, clientId) => {
 
       localStreamRef.current = await navigator.mediaDevices.getUserMedia({
          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
+            echoCancellation: { ideal: true },
+            noiseSuppression: { ideal: true },
+            autoGainControl: { ideal: true },
+            channelCount: { ideal: 1 },
+            sampleRate: { ideal: 48000 },
+            sampleSize: { ideal: 16 },
          },
       })
 
@@ -74,7 +196,7 @@ export const useVoiceChat = (socket, clientId) => {
 
    const createPeerConnection = useCallback(
       async (targetId: string, initiator: boolean) => {
-         if (!socket || !clientId || !voiceChatEnabledRef.current) return null
+         if (!socket || !clientId || targetId === clientId || !voiceChatEnabledRef.current) return null
 
          if (peersRef.current[targetId]) {
             return peersRef.current[targetId]
@@ -96,6 +218,7 @@ export const useVoiceChat = (socket, clientId) => {
                trickle: true,
                stream,
                config: iceServers,
+               sdpTransform: preferOpusVoiceSettings,
             })
 
             peersRef.current[targetId] = peer
@@ -106,7 +229,7 @@ export const useVoiceChat = (socket, clientId) => {
             })
 
             peer.on('signal', (signal) => {
-               if (socket.readyState !== WebSocket.OPEN) {
+               if (socket.readyState !== WebSocket.OPEN || socket.bufferedAmount > SIGNAL_BUFFER_LIMIT) {
                   return
                }
 
@@ -120,17 +243,32 @@ export const useVoiceChat = (socket, clientId) => {
 
             peer.on('connect', () => console.log(`Connected to ${targetId}`))
 
+            peer.on('iceStateChange', (state) => {
+               if (DISCONNECTED_ICE_STATES.has(state)) {
+                  destroyPeer(targetId)
+               }
+            })
+
             peer.on('stream', (remoteStream) => {
+               startSpeakingDetection(targetId, remoteStream)
+
                const existingAudio = audioElementsRef.current[targetId]
                if (existingAudio) {
                   existingAudio.srcObject = remoteStream
+                  existingAudio.muted = false
+                  void existingAudio.play().catch((error) => {
+                     console.error('Error playing remote audio:', error)
+                  })
                   return
                }
 
                const audio = new Audio()
                audio.autoplay = true
+               audio.playsInline = true
                audio.srcObject = remoteStream
-               audio.muted = !clientsRef.current[targetId]?.microphone
+               audio.muted = false
+               audio.style.display = 'none'
+               document.body.appendChild(audio)
                audio.play().catch((error) => {
                   console.error('Error playing remote audio:', error)
                })
@@ -151,7 +289,7 @@ export const useVoiceChat = (socket, clientId) => {
             delete pendingPeersRef.current[targetId]
          }
       },
-      [clientId, destroyPeer, getLocalStream, iceServers, socket]
+      [clientId, destroyPeer, getLocalStream, iceServers, socket, startSpeakingDetection]
    )
 
    useEffect(() => {
@@ -181,13 +319,13 @@ export const useVoiceChat = (socket, clientId) => {
 
    useEffect(() => {
       for (const id in peersRef.current) {
-         if (!clients[id]) {
+         if (!clients[id]?.microphone) {
             destroyPeer(id)
          }
       }
 
       for (const id in audioElementsRef.current) {
-         audioElementsRef.current[id].muted = !clients[id]?.microphone
+         audioElementsRef.current[id].muted = false
       }
 
       if (!voiceChatEnabledRef.current || !clientId) {
@@ -209,7 +347,10 @@ export const useVoiceChat = (socket, clientId) => {
       }
 
       stopLocalStream()
-   }, [destroyPeer, stopLocalStream])
+      if (clientId) {
+         stopSpeakingDetection(clientId)
+      }
+   }, [clientId, destroyPeer, stopLocalStream, stopSpeakingDetection])
 
    useEffect(() => {
       return () => {
@@ -223,7 +364,8 @@ export const useVoiceChat = (socket, clientId) => {
       voiceChatEnabledRef.current = true
 
       try {
-         await getLocalStream()
+         const stream = await getLocalStream()
+         startSpeakingDetection(clientId, stream)
       } catch (error) {
          voiceChatEnabledRef.current = false
          console.error('Error getting user media:', error)
@@ -231,7 +373,7 @@ export const useVoiceChat = (socket, clientId) => {
       }
 
       for (const id in clientsRef.current) {
-         if (id !== clientId) {
+         if (id !== clientId && clientsRef.current[id]?.microphone) {
             const shouldInitiateConnection = clientId > id
             void createPeerConnection(id, shouldInitiateConnection)
          }
