@@ -16,6 +16,13 @@ export const useKeyboardInset = () => {
       const updateInset = () => {
          const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
          document.documentElement.style.setProperty('--mk-keyboard-inset', `${Math.round(inset)}px`)
+
+         // Focusing the composer makes mobile browsers scroll the layout viewport up to
+         // reveal it. The body never scrolls back on its own, so once the keyboard closes
+         // that offset would leave the HUD sitting above the top of the screen.
+         if (inset === 0 && (window.scrollX !== 0 || window.scrollY !== 0)) {
+            window.scrollTo(0, 0)
+         }
       }
 
       updateInset()

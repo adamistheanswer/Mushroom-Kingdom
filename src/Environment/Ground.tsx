@@ -34,7 +34,7 @@ const Ground: React.FC = () => {
             args={[WORLD_SIZE, WORLD_SIZE, TERRAIN_SEGMENTS, TERRAIN_SEGMENTS]}
             ref={terrain}
          />
-         <meshStandardMaterial attach="material" color="#5EA274" />
+         <meshStandardMaterial attach="material" color="#5b603f" />
       </mesh>
    )
 }

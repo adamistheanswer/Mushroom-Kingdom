@@ -270,7 +270,7 @@ body {
       position: absolute;
       bottom: calc(var(--mk-hud-bottom) + var(--mk-joystick-height) + 10px);
       left: max(14px, env(safe-area-inset-left));
-      width: min(340px, calc(100vw - 40px));
+      right: max(14px, env(safe-area-inset-right));
       padding: 8px;
       border: 2px solid darkgreen;
       border-radius: 8px;
