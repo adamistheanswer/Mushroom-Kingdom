@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import nipplejs from 'nipplejs'
 
-export function useJoystickControls(isTabletOrMobile: boolean) {
+export function useJoystickControls() {
    const inputs = useRef({
       forwardJoy: 0,
       backwardJoy: 0,
@@ -56,9 +56,29 @@ export function useJoystickControls(isTabletOrMobile: boolean) {
    const joyManager = useRef<ReturnType<typeof nipplejs.create> | null>(null)
 
    useEffect(() => {
+      const mediaQuery = window.matchMedia('(max-width: 1224px)')
       const zone = document.getElementById('joystickWrapper1')
 
-      if (!joyManager.current && isTabletOrMobile && zone) {
+      const stopJoystickPointerEvent = (event: Event) => {
+         event.stopPropagation()
+      }
+
+      const destroyJoystick = () => {
+         handleEnd()
+
+         if (joyManager.current) {
+            joyManager.current.off('move', handleMove)
+            joyManager.current.off('end', handleEnd)
+            joyManager.current.destroy()
+            joyManager.current = null
+         }
+      }
+
+      const createJoystick = () => {
+         if (joyManager.current || !zone) {
+            return
+         }
+
          joyManager.current = nipplejs.create({
             zone,
             size: 120,
@@ -72,15 +92,34 @@ export function useJoystickControls(isTabletOrMobile: boolean) {
          joyManager.current.on('end', handleEnd)
       }
 
-      return () => {
-         if (joyManager.current) {
-            joyManager.current.off('move', handleMove)
-            joyManager.current.off('end', handleEnd)
-            joyManager.current.destroy()
-            joyManager.current = null
+      const syncJoystick = () => {
+         if (mediaQuery.matches) {
+            createJoystick()
+         } else {
+            destroyJoystick()
          }
       }
-   }, [isTabletOrMobile])
+
+      zone?.addEventListener('pointerdown', stopJoystickPointerEvent)
+      zone?.addEventListener('pointermove', stopJoystickPointerEvent)
+      zone?.addEventListener('pointerup', stopJoystickPointerEvent)
+      zone?.addEventListener('touchstart', stopJoystickPointerEvent)
+      zone?.addEventListener('touchmove', stopJoystickPointerEvent)
+      zone?.addEventListener('touchend', stopJoystickPointerEvent)
+      mediaQuery.addEventListener('change', syncJoystick)
+      syncJoystick()
+
+      return () => {
+         mediaQuery.removeEventListener('change', syncJoystick)
+         zone?.removeEventListener('pointerdown', stopJoystickPointerEvent)
+         zone?.removeEventListener('pointermove', stopJoystickPointerEvent)
+         zone?.removeEventListener('pointerup', stopJoystickPointerEvent)
+         zone?.removeEventListener('touchstart', stopJoystickPointerEvent)
+         zone?.removeEventListener('touchmove', stopJoystickPointerEvent)
+         zone?.removeEventListener('touchend', stopJoystickPointerEvent)
+         destroyJoystick()
+      }
+   }, [])
 
    return inputs
 }

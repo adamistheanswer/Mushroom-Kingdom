@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useCallback, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Vector3, Euler, Group } from 'three'
-import { useMediaQuery } from 'react-responsive'
 import { Avatar } from './Avatar'
 import { useKeyboardControls } from '../Utils/useKeyboardControls'
 import { useJoystickControls } from '../Utils/useJoystickControls'
@@ -43,8 +42,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
    const tempEuler = useMemo(() => new Euler(), [])
    const upVector = useMemo(() => new Vector3(0, 1, 0), [])
 
-   const isTabletOrMobile = useMediaQuery({ query: '(max-width: 1224px)' })
-   const joystickControls = useJoystickControls(isTabletOrMobile)
+   const joystickControls = useJoystickControls()
 
    const disableControls = useIsTyping()
 
@@ -192,7 +190,6 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
          />
          <OrbitControls
             ref={orbitRef}
-            target={groupRef.current?.position}
             autoRotate={false}
             enableDamping={true}
             dampingFactor={0.1}
