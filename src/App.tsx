@@ -15,6 +15,7 @@ import useSceneryStore from './State/SceneryStore'
 import { PCFShadowMap } from 'three'
 import { PlayerPositionUpdate, PlayerSnapshotData, usePlayerPositionsStore } from './State/playerPositionsStore'
 import useClientAudioStore from './State/clientsAudioStore'
+import { MobileJoystick } from './Utils/useJoystickControls'
 
 function createSocket() {
    const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
@@ -204,6 +205,7 @@ const App: React.FC = () => {
          </Canvas>
 
          {socket && <OverlayUIWrapper socket={socket} />}
+         {socket && <MobileJoystick />}
          {socket && <PlayerAudioConnection socket={socket} />}
       </div>
    )
