@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { encode } from '@msgpack/msgpack'
+import { useIsMobile } from '../Utils/useIsMobile'
 
 interface WebSocketMessage {
    type: string
@@ -12,18 +13,7 @@ interface UserNameFormProps {
 
 const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
    const [userName, setUserName] = useState('')
-   const [isMobile, setIsMobile] = useState(window.innerWidth <= 480)
-
-   useEffect(() => {
-      const handleResize = () => {
-         setIsMobile(window.innerWidth <= 480)
-      }
-
-      window.addEventListener('resize', handleResize)
-      return () => {
-         window.removeEventListener('resize', handleResize)
-      }
-   }, [])
+   const isMobile = useIsMobile('(max-width: 480px)')
 
    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       setUserName(event.target.value)
@@ -44,8 +34,9 @@ const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
       alignItems: 'center',
       justifyContent: 'center',
       position: 'absolute',
-      top: isMobile ? '23px' : '10px',
-      left: isMobile ? '20px' : '50%',
+      top: isMobile ? 'max(20px, env(safe-area-inset-top))' : '10px',
+      left: isMobile ? '84px' : '50%',
+      right: isMobile ? '84px' : 'auto',
       transform: isMobile ? 'none' : 'translateX(-50%)',
       zIndex: 100,
    }
@@ -59,7 +50,8 @@ const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
       padding: '5px 10px',
       textAlign: 'center',
       margin: '5px 0',
-      width: '200px',
+      width: isMobile ? '100%' : '200px',
+      boxSizing: 'border-box',
       transition: '0.3s',
    }
 
