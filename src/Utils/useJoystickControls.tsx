@@ -1,125 +1,153 @@
-import { useEffect, useRef } from 'react'
-import nipplejs from 'nipplejs'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-export function useJoystickControls() {
-   const inputs = useRef({
+const JOYSTICK_DEADZONE = 0.4
+const JOYSTICK_SIZE = 120
+const JOYSTICK_STICK_SIZE = 64
+const JOYSTICK_RADIUS = JOYSTICK_SIZE / 2
+const JOYSTICK_STICK_MAX_OFFSET = (JOYSTICK_SIZE - JOYSTICK_STICK_SIZE) / 2
+
+const inputs = {
+   current: {
       forwardJoy: 0,
       backwardJoy: 0,
       leftJoy: 0,
       rightJoy: 0,
-   })
+   },
+}
 
-   const handleEnd = () => {
+const resetJoystickControls = () => {
+   inputs.current.forwardJoy = 0
+   inputs.current.backwardJoy = 0
+   inputs.current.leftJoy = 0
+   inputs.current.rightJoy = 0
+}
+
+const applyDeadzone = (value: number) => {
+   const absoluteValue = Math.abs(value)
+   return absoluteValue > JOYSTICK_DEADZONE ? absoluteValue : 0
+}
+
+const setJoystickAxes = (x: number, y: number) => {
+   const forwardLimiter = applyDeadzone(y)
+   if (y > JOYSTICK_DEADZONE) {
+      inputs.current.forwardJoy = forwardLimiter
+      inputs.current.backwardJoy = 0
+   } else if (y < -JOYSTICK_DEADZONE) {
+      inputs.current.forwardJoy = 0
+      inputs.current.backwardJoy = forwardLimiter
+   } else {
       inputs.current.forwardJoy = 0
       inputs.current.backwardJoy = 0
+   }
+
+   const turnLimiter = applyDeadzone(x)
+   if (x > JOYSTICK_DEADZONE) {
+      inputs.current.leftJoy = 0
+      inputs.current.rightJoy = turnLimiter
+   } else if (x < -JOYSTICK_DEADZONE) {
+      inputs.current.leftJoy = turnLimiter
+      inputs.current.rightJoy = 0
+   } else {
       inputs.current.leftJoy = 0
       inputs.current.rightJoy = 0
    }
+}
 
-   const handleMove = (event: any) => {
-      const data = event.data
-
-      if (!data?.vector) {
-         return
-      }
-
-      const forward = data.vector.y
-      const turn = data.vector.x
-
-      let forwardLimiter = 0
-      if (Math.abs(forward) > 0.4) {
-         forwardLimiter = Math.abs(forward)
-      }
-
-      if (forward > 0) {
-         inputs.current.forwardJoy = forwardLimiter
-         inputs.current.backwardJoy = 0
-      } else if (forward < 0) {
-         inputs.current.forwardJoy = 0
-         inputs.current.backwardJoy = forwardLimiter
-      }
-
-      let turnLimiter = 0
-      if (Math.abs(turn) > 0.4) {
-         turnLimiter = Math.abs(turn)
-      }
-
-      if (turn > 0) {
-         inputs.current.leftJoy = 0
-         inputs.current.rightJoy = turnLimiter
-      } else if (turn < 0) {
-         inputs.current.leftJoy = turnLimiter
-         inputs.current.rightJoy = 0
-      }
-   }
-
-   const joyManager = useRef<ReturnType<typeof nipplejs.create> | null>(null)
-
+export function useJoystickControls() {
    useEffect(() => {
-      const mediaQuery = window.matchMedia('(max-width: 1224px)')
-      const zone = document.getElementById('joystickWrapper1')
-
-      const stopJoystickPointerEvent = (event: Event) => {
-         event.stopPropagation()
-      }
-
-      const destroyJoystick = () => {
-         handleEnd()
-
-         if (joyManager.current) {
-            joyManager.current.off('move', handleMove)
-            joyManager.current.off('end', handleEnd)
-            joyManager.current.destroy()
-            joyManager.current = null
-         }
-      }
-
-      const createJoystick = () => {
-         if (joyManager.current || !zone) {
-            return
-         }
-
-         joyManager.current = nipplejs.create({
-            zone,
-            size: 120,
-            maxNumberOfJoysticks: 1,
-            mode: 'static',
-            restJoystick: true,
-            shape: 'circle',
-            position: { left: '110px', top: '110px' },
-         })
-         joyManager.current.on('move', handleMove)
-         joyManager.current.on('end', handleEnd)
-      }
-
-      const syncJoystick = () => {
-         if (mediaQuery.matches) {
-            createJoystick()
-         } else {
-            destroyJoystick()
-         }
-      }
-
-      zone?.addEventListener('pointerdown', stopJoystickPointerEvent)
-      zone?.addEventListener('pointermove', stopJoystickPointerEvent)
-      zone?.addEventListener('pointerup', stopJoystickPointerEvent)
-      zone?.addEventListener('touchstart', stopJoystickPointerEvent)
-      zone?.addEventListener('touchmove', stopJoystickPointerEvent)
-      zone?.addEventListener('touchend', stopJoystickPointerEvent)
-      mediaQuery.addEventListener('change', syncJoystick)
-      syncJoystick()
-
-      return () => {
-         mediaQuery.removeEventListener('change', syncJoystick)
-         zone?.removeEventListener('pointerdown', stopJoystickPointerEvent)
-         zone?.removeEventListener('pointermove', stopJoystickPointerEvent)
-         zone?.removeEventListener('pointerup', stopJoystickPointerEvent)
-         zone?.removeEventListener('touchstart', stopJoystickPointerEvent)
-         zone?.removeEventListener('touchmove', stopJoystickPointerEvent)
-         zone?.removeEventListener('touchend', stopJoystickPointerEvent)
-         destroyJoystick()
-      }
+      return resetJoystickControls
    }, [])
 
    return inputs
+}
+
+export function MobileJoystick() {
+   const baseRef = useRef<HTMLDivElement>(null)
+   const pointerId = useRef<number | null>(null)
+   const [stickOffset, setStickOffset] = useState({ x: 0, y: 0 })
+
+   const resetJoystick = useCallback(() => {
+      pointerId.current = null
+      setStickOffset({ x: 0, y: 0 })
+      resetJoystickControls()
+   }, [])
+
+   const updateJoystickFromPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      const rect = baseRef.current?.getBoundingClientRect()
+      if (!rect) {
+         return
+      }
+
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      const rawX = event.clientX - centerX
+      const rawY = event.clientY - centerY
+      const distance = Math.hypot(rawX, rawY)
+      const limiter = distance > JOYSTICK_RADIUS ? JOYSTICK_RADIUS / distance : 1
+      const x = rawX * limiter
+      const y = rawY * limiter
+      const normalizedX = x / JOYSTICK_RADIUS
+      const normalizedY = -y / JOYSTICK_RADIUS
+
+      setStickOffset({
+         x: normalizedX * JOYSTICK_STICK_MAX_OFFSET,
+         y: -normalizedY * JOYSTICK_STICK_MAX_OFFSET,
+      })
+      setJoystickAxes(normalizedX, normalizedY)
+   }, [])
+
+   const handlePointerDown = useCallback(
+      (event: React.PointerEvent<HTMLDivElement>) => {
+         event.preventDefault()
+         event.stopPropagation()
+         pointerId.current = event.pointerId
+         event.currentTarget.setPointerCapture(event.pointerId)
+         updateJoystickFromPointer(event)
+      },
+      [updateJoystickFromPointer]
+   )
+
+   const handlePointerMove = useCallback(
+      (event: React.PointerEvent<HTMLDivElement>) => {
+         if (pointerId.current !== event.pointerId) {
+            return
+         }
+
+         event.preventDefault()
+         event.stopPropagation()
+         updateJoystickFromPointer(event)
+      },
+      [updateJoystickFromPointer]
+   )
+
+   const handlePointerUp = useCallback(
+      (event: React.PointerEvent<HTMLDivElement>) => {
+         if (pointerId.current !== event.pointerId) {
+            return
+         }
+
+         event.preventDefault()
+         event.stopPropagation()
+         resetJoystick()
+      },
+      [resetJoystick]
+   )
+
+   const stickStyle = {
+      transform: `translate(calc(-50% + ${stickOffset.x}px), calc(-50% + ${stickOffset.y}px))`,
+   }
+
+   return (
+      <div
+         id="joystickWrapper1"
+         onPointerDown={handlePointerDown}
+         onPointerMove={handlePointerMove}
+         onPointerUp={handlePointerUp}
+         onPointerCancel={handlePointerUp}
+      >
+         <div ref={baseRef} className="mobileJoystickBase" role="presentation">
+            <div className="mobileJoystickStick" style={stickStyle} />
+         </div>
+      </div>
+   )
 }

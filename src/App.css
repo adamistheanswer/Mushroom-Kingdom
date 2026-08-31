@@ -7,14 +7,43 @@ body {
 
 #joystickWrapper1 {
    position: fixed;
-   right: 0;
-   bottom: 0;
-   width: 220px;
-   height: 220px;
+   right: max(8px, env(safe-area-inset-right));
+   bottom: max(8px, env(safe-area-inset-bottom));
+   width: 140px;
+   height: 140px;
    z-index: 10;
    display: none;
    touch-action: none;
+   pointer-events: auto;
    user-select: none;
+   -webkit-user-select: none;
+   -webkit-touch-callout: none;
+   align-items: center;
+   justify-content: center;
+}
+
+.mobileJoystickBase {
+   position: relative;
+   width: 120px;
+   height: 120px;
+   border: 2px solid darkgreen;
+   border-radius: 50%;
+   background-color: rgba(0, 50, 0, 0.75);
+   box-sizing: border-box;
+   touch-action: none;
+}
+
+.mobileJoystickStick {
+   position: absolute;
+   left: 50%;
+   top: 50%;
+   width: 64px;
+   height: 64px;
+   border-radius: 50%;
+   background-color: rgba(28, 120, 42, 0.95);
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+   pointer-events: none;
+   touch-action: none;
 }
 
 #pingStats {
@@ -30,20 +59,14 @@ body {
 
 @media (max-width: 1224px) {
    #joystickWrapper1 {
-      display: block;
+      display: flex;
    }
 }
 
-@media (min-width: 1224px) {
+@media (min-width: 1225px) {
    #joystickWrapper1 {
       display: none;
    }
-}
-
-.nipple.collection_0 .back {
-   background-color: rgba(0, 50, 0, 1d) !important;
-   border: 2px solid darkgreen !important;
-   border-radius: 50% !important;
 }
 
 @keyframes pulse {
