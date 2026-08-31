@@ -1,3 +1,14 @@
+:root {
+   /* Mobile HUD stack, measured up from the bottom of the screen:
+      composer bar, then the joystick + chat toggle, then the message log. */
+   --mk-safe-bottom: max(12px, env(safe-area-inset-bottom));
+   --mk-composer-height: 44px;
+   --mk-hud-bottom: calc(var(--mk-safe-bottom) + var(--mk-composer-height) + 8px);
+   --mk-joystick-height: 140px;
+   /* Set from the visual viewport so the composer rides above the keyboard. */
+   --mk-keyboard-inset: 0px;
+}
+
 body {
    margin: 0;
    overflow: hidden;
@@ -9,8 +20,8 @@ body {
    position: fixed;
    right: max(8px, env(safe-area-inset-right));
    bottom: max(8px, env(safe-area-inset-bottom));
-   width: 140px;
-   height: 140px;
+   width: var(--mk-joystick-height);
+   height: var(--mk-joystick-height);
    z-index: 10;
    display: none;
    touch-action: none;
@@ -77,6 +88,17 @@ body {
    background: rgba(0, 28, 0, 0.62);
    box-sizing: border-box;
    scrollbar-width: thin;
+}
+
+.chat-panel__empty {
+   margin: 0;
+   color: rgba(214, 255, 209, 0.72);
+   font-size: 13px;
+}
+
+.chat-panel__log-header,
+.chat-panel__toggle {
+   display: none;
 }
 
 .chat-panel__message {
@@ -176,28 +198,142 @@ body {
 }
 
 @media (max-width: 640px) {
+   /* Joystick rides above the message bar that now runs along the bottom. */
+   #joystickWrapper1 {
+      bottom: var(--mk-hud-bottom);
+   }
+
+   /* The panel becomes a full screen layer so the composer and the log can be
+      anchored independently: composer along the bottom, message log bottom left. */
    .chat-panel {
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      width: auto;
+      pointer-events: none;
+   }
+
+   /* Message bar spans the very bottom, under both the joystick and the toggle. */
+   .chat-panel__form {
+      position: absolute;
+      right: max(14px, env(safe-area-inset-right));
+      bottom: calc(var(--mk-safe-bottom) + var(--mk-keyboard-inset));
       left: max(14px, env(safe-area-inset-left));
-      bottom: max(14px, env(safe-area-inset-bottom));
-      width: min(300px, calc(100vw - 28px));
+      gap: 6px;
+      margin-top: 0;
+      pointer-events: auto;
+   }
+
+   .chat-panel__toggle {
+      position: absolute;
+      bottom: var(--mk-hud-bottom);
+      left: max(20px, env(safe-area-inset-left));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      width: 50px;
+      height: 50px;
+      padding: 0;
+      border: 2px solid darkgreen;
+      border-radius: 50%;
+      background: rgba(0, 50, 0, 0.72);
+      color: white;
+      cursor: pointer;
+      font-size: 22px;
+      line-height: 1;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+   }
+
+   .chat-panel__badge {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
+      border-radius: 10px;
+      background: #d8452f;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+   }
+
+   /* Opens above the joystick so it never swallows movement taps. */
+   .chat-panel__log {
+      position: absolute;
+      bottom: calc(var(--mk-hud-bottom) + var(--mk-joystick-height) + 10px);
+      left: max(14px, env(safe-area-inset-left));
+      width: min(340px, calc(100vw - 40px));
+      padding: 8px;
+      border: 2px solid darkgreen;
+      border-radius: 8px;
+      background: rgba(0, 28, 0, 0.82);
+      box-sizing: border-box;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+      visibility: hidden;
+      pointer-events: none;
+   }
+
+   .chat-panel__log--open {
+      opacity: 1;
+      transform: translateY(0);
+      visibility: visible;
+      pointer-events: auto;
+   }
+
+   .chat-panel__log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+   }
+
+   .chat-panel__log-title {
+      color: #8df577;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+   }
+
+   .chat-panel__log-close {
+      padding: 2px 6px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: rgba(214, 255, 209, 0.8);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
    }
 
    .chat-panel__messages {
-      max-height: 120px;
-      padding: 8px;
+      max-height: min(34vh, 210px);
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: none;
    }
 
    .chat-panel__message {
-      gap: 5px;
+      gap: 6px;
+      margin-bottom: 5px;
       font-size: 13px;
-   }
-
-   .chat-panel__time {
-      font-size: 11px;
+      line-height: 1.2;
    }
 
    .chat-panel__name {
-      max-width: 92px;
+      max-width: 96px;
    }
 
    .chat-panel__status {
@@ -207,19 +343,15 @@ body {
       line-height: 1.1;
    }
 
-   .chat-panel__form {
-      gap: 6px;
-      margin-top: 6px;
-   }
-
+   /* 16px keeps iOS from zooming the viewport when the composer is focused. */
    .chat-panel__input {
-      font-size: 15px;
-      padding: 7px 9px;
+      font-size: 16px;
+      padding: 8px 10px;
    }
 
    .chat-panel__send {
-      font-size: 14px;
-      padding: 0 11px;
+      font-size: 13px;
+      padding: 0 12px;
    }
 }
 

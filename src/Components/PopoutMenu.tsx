@@ -58,8 +58,8 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
 
    const containerStyle = {
       position: 'fixed',
-      left: '20px',
-      top: '20px',
+      left: 'max(20px, env(safe-area-inset-left))',
+      top: 'max(20px, env(safe-area-inset-top))',
       zIndex: 30,
    }
 
