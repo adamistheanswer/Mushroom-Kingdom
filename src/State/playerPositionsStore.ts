@@ -22,6 +22,7 @@ export interface RemotePlayerPosition {
    action?: string
    userName?: string
    microphone?: boolean
+   showSpawnEffect: boolean
    seq: number
    serverTime: number
 }
@@ -47,7 +48,13 @@ function updateTargetTransform(player: RemotePlayerPosition, next: PlayerSnapsho
    }
 }
 
-function createRemotePlayer(clientId: string, data: PlayerSnapshotData, seq = 0, serverTime = Date.now()) {
+function createRemotePlayer(
+   clientId: string,
+   data: PlayerSnapshotData,
+   seq = 0,
+   serverTime = Date.now(),
+   showSpawnEffect = false
+) {
    return {
       id: clientId,
       targetPosition: new Vector3(data.position?.[0] ?? 0, data.position?.[1] ?? 0, data.position?.[2] ?? 0),
@@ -55,6 +62,7 @@ function createRemotePlayer(clientId: string, data: PlayerSnapshotData, seq = 0,
       action: data.action,
       userName: data.userName,
       microphone: data.microphone,
+      showSpawnEffect,
       seq,
       serverTime,
    }
@@ -144,7 +152,7 @@ export const usePlayerPositionsStore = create<PlayerPositionsStore>()((set, get)
 
             shouldPublish = updateRemotePlayer(currentClientData, nextClientData, seq, serverTime) || shouldPublish
          } else {
-            playerPositions.set(clientId, createRemotePlayer(clientId, nextClientData, seq, serverTime))
+            playerPositions.set(clientId, createRemotePlayer(clientId, nextClientData, seq, serverTime, true))
             shouldPublish = true
          }
       }

@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { Float32BufferAttribute, PlaneGeometry } from 'three'
+import { WORLD_SIZE } from '../constants'
 
 const Ground: React.FC = () => {
    const noise2D = createNoise2D()
@@ -35,7 +36,7 @@ const Ground: React.FC = () => {
 
    return (
       <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-         <planeGeometry attach="geometry" args={[1000, 1000, 1000, 1000]} ref={terrain} />
+         <planeGeometry attach="geometry" args={[WORLD_SIZE, WORLD_SIZE, 1000, 1000]} ref={terrain} />
          <meshStandardMaterial attach="material" color="#5EA274" />
       </mesh>
    )

@@ -12,6 +12,7 @@ import {
    usePlayerPositionsStore,
 } from '../State/playerPositionsStore'
 import useClientAudioStore from '../State/clientsAudioStore'
+import SpawnEffect from './SpawnEffect'
 
 interface WebSocketMessage {
    type: string
@@ -62,6 +63,7 @@ const RemotePlayer = React.memo(
 
       return (
          <group ref={positionGroupRef}>
+            {player.showSpawnEffect && <SpawnEffect />}
             <NamePlate
                position={REMOTE_CHILD_POSITION}
                clientId={player.id}

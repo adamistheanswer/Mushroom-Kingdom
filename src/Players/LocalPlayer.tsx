@@ -14,8 +14,10 @@ import { encode } from '@msgpack/msgpack'
 import { useIsTyping } from '../Utils/useIsTyping'
 import { usePlayerPositionsStore } from '../State/playerPositionsStore'
 import { isColliding } from '../Utils/isColliding'
+import { isWithinWorldBounds } from '../Utils/isWithinWorldBounds'
 import useClientAudioStore from '../State/clientsAudioStore'
 import usePlayerActionStore from '../State/playerActionStore'
+import SpawnEffect from './SpawnEffect'
 
 const LOCAL_CHILD_POSITION = new Vector3(0, 0, 0)
 const LOCAL_CHILD_ROTATION = new Euler(0, 0, 0)
@@ -100,7 +102,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             if ((!isTyping && forward) || forwardJoy !== 0) {
                tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
                const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
-               if (!isColliding(newPosition, playerPositions.current, tempVector, 5)) {
+               if (isWithinWorldBounds(newPosition) && !isColliding(newPosition, playerPositions.current, tempVector, 5)) {
                   group.position.copy(newPosition)
                }
                actionsArray.push('Walking')
@@ -109,7 +111,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             if ((!isTyping && backward) || backwardJoy !== 0) {
                tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
                const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
-               if (!isColliding(newPosition, playerPositions.current, tempVector, 5)) {
+               if (isWithinWorldBounds(newPosition) && !isColliding(newPosition, playerPositions.current, tempVector, 5)) {
                   group.position.copy(newPosition)
                }
                actionsArray.push('WalkingB')
@@ -118,7 +120,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             if ((!isTyping && left) || leftJoy !== 0) {
                tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
                const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
-               if (!isColliding(newPosition, playerPositions.current, tempVector, 5)) {
+               if (isWithinWorldBounds(newPosition) && !isColliding(newPosition, playerPositions.current, tempVector, 5)) {
                   group.position.copy(newPosition)
                }
                if ((!isTyping && backward) || backwardJoy !== 0) {
@@ -131,7 +133,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
             if ((!isTyping && right) || rightJoy !== 0) {
                tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
                const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
-               if (!isColliding(newPosition, playerPositions.current, tempVector, 5)) {
+               if (isWithinWorldBounds(newPosition) && !isColliding(newPosition, playerPositions.current, tempVector, 5)) {
                   group.position.copy(newPosition)
                }
                if ((!isTyping && backward) || backwardJoy !== 0) {
@@ -197,6 +199,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    return (
       <group ref={groupRef}>
+         <SpawnEffect />
          <NamePlate
             key={localClientId}
             position={LOCAL_CHILD_POSITION}

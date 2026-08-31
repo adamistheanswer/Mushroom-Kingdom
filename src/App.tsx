@@ -4,6 +4,7 @@ import { PerspectiveCamera, Stats } from '@react-three/drei'
 import Lighting from './Environment/Lighting'
 import Ground from './Environment/Ground'
 import Forest from './Environment/Forest'
+import BoundaryWalls from './Environment/BoundaryWalls'
 import Loader from './Components/Loader'
 import RemotePlayers from './Players/RemotePlayers'
 import LocalPlayer from './Players/LocalPlayer'
@@ -201,6 +202,7 @@ const App: React.FC = () => {
                {socket && <LocalPlayer clientSocket={socket} />}
                <Ground />
                <Forest />
+               <BoundaryWalls />
             </Suspense>
          </Canvas>
 

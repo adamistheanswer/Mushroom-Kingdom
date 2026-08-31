@@ -1,6 +1,8 @@
 import { setClient, getClient } from '../state/clientState.js'
 import { broadcastClientVoiceChatStatusUpdate, markClientUpdated } from './broadcastHandler.js'
 
+const PLAYER_WORLD_LIMIT = 485
+
 function arraysEqual(a, b) {
    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
       return false
@@ -11,6 +13,26 @@ function arraysEqual(a, b) {
 
 function normaliseMovementRotation(rotation) {
    return [0, Number(rotation?.[1] ?? 0), 0]
+}
+
+function clamp(value, min, max) {
+   return Math.min(Math.max(value, min), max)
+}
+
+function normaliseMovementPosition(position, fallbackPosition) {
+   if (!Array.isArray(position) || position.length < 3) {
+      return fallbackPosition
+   }
+
+   const x = Number(position[0])
+   const y = Number(position[1])
+   const z = Number(position[2])
+
+   if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      return fallbackPosition
+   }
+
+   return [clamp(x, -PLAYER_WORLD_LIMIT, PLAYER_WORLD_LIMIT), y, clamp(z, -PLAYER_WORLD_LIMIT, PLAYER_WORLD_LIMIT)]
 }
 
 export function handleStateSetVoiceChatStatus(message) {
@@ -58,17 +80,18 @@ export function handleStateSetPlayerMovement(clientId, message) {
    const clientData = getClient(clientId)
    if (!clientData) return
    const nextRotation = normaliseMovementRotation(rotation)
+   const nextPosition = normaliseMovementPosition(position, clientData.position)
 
    const unchanged =
       clientData.action === action &&
-      arraysEqual(clientData.position, position) &&
+      arraysEqual(clientData.position, nextPosition) &&
       arraysEqual(clientData.rotation, nextRotation)
 
    if (unchanged) {
       return
    }
 
-   clientData.position = position
+   clientData.position = nextPosition
    clientData.rotation = nextRotation
    clientData.action = action
    setClient(clientId, clientData)
