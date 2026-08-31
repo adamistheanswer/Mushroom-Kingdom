@@ -1,5 +1,5 @@
 import React from 'react'
-import { useProgress, Html } from '@react-three/drei'
+import { Html } from '@react-three/drei'
 import styled, { keyframes } from 'styled-components'
 
 const spin = keyframes`
@@ -120,20 +120,7 @@ const LoadingText = styled.div`
    animation: ${psychedelicText} 10s linear infinite;
 `
 
-function getFileName(item) {
-   if (!item) return ''
-
-   const pathParts = item.split('/')
-   const fileNameWithExt = pathParts[pathParts.length - 1]
-   const fileName = fileNameWithExt.split('.').slice(0, -1).join('.')
-
-   if (!fileName) return 'Stream Data'
-   return fileName
-}
-
 export default function Loader() {
-   const { item } = useProgress()
-
    return (
       <Html fullscreen>
          <PsychedelicBG />
@@ -158,7 +145,7 @@ export default function Loader() {
                />
             </svg>
          </Logo>
-         <LoadingText>loading File - {getFileName(item)}</LoadingText>
+         <LoadingText>Loading...</LoadingText>
       </Html>
    )
 }

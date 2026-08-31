@@ -1,22 +1,7 @@
 import { useEffect, useRef } from 'react'
 import nipplejs from 'nipplejs'
 
-declare interface ManagerOptions {
-   zone?: HTMLElement
-   color?: string
-   size?: number
-   threshold?: number
-   fadeTime?: number
-   multitouch?: boolean
-   maxNumberOfNipples?: number
-   dataOnly?: boolean
-   position?: any
-   mode?: string
-   restOpacity?: number
-   catchDistance?: MimeType
-}
-
-export function useJoystickControls(isTabletOrMobile: boolean) {
+export function useJoystickControls() {
    const inputs = useRef({
       forwardJoy: 0,
       backwardJoy: 0,
@@ -31,7 +16,13 @@ export function useJoystickControls(isTabletOrMobile: boolean) {
       inputs.current.rightJoy = 0
    }
 
-   const handleMove = (_: {}, data: any) => {
+   const handleMove = (event: any) => {
+      const data = event.data
+
+      if (!data?.vector) {
+         return
+      }
+
       const forward = data.vector.y
       const turn = data.vector.x
 
@@ -62,31 +53,73 @@ export function useJoystickControls(isTabletOrMobile: boolean) {
       }
    }
 
-   let joyManager
+   const joyManager = useRef<ReturnType<typeof nipplejs.create> | null>(null)
 
    useEffect(() => {
-      if (!joyManager && isTabletOrMobile) {
-         joyManager = nipplejs.create({
-            zone: document.getElementById('joystickWrapper1')!,
+      const mediaQuery = window.matchMedia('(max-width: 1224px)')
+      const zone = document.getElementById('joystickWrapper1')
+
+      const stopJoystickPointerEvent = (event: Event) => {
+         event.stopPropagation()
+      }
+
+      const destroyJoystick = () => {
+         handleEnd()
+
+         if (joyManager.current) {
+            joyManager.current.off('move', handleMove)
+            joyManager.current.off('end', handleEnd)
+            joyManager.current.destroy()
+            joyManager.current = null
+         }
+      }
+
+      const createJoystick = () => {
+         if (joyManager.current || !zone) {
+            return
+         }
+
+         joyManager.current = nipplejs.create({
+            zone,
             size: 120,
-            maxNumberOfNipples: 1,
+            maxNumberOfJoysticks: 1,
             mode: 'static',
             restJoystick: true,
             shape: 'circle',
-            position: { bottom: '80px', right: '80px' },
-            dynamicPage: true,
-         }) as ManagerOptions
-         joyManager['0'].on('move', handleMove)
-         joyManager['0'].on('end', handleEnd)
+            position: { left: '110px', top: '110px' },
+         })
+         joyManager.current.on('move', handleMove)
+         joyManager.current.on('end', handleEnd)
       }
 
-      return () => {
-         if (joyManager) {
-            joyManager['0'].off('move', handleMove)
-            joyManager['0'].off('end', handleEnd)
+      const syncJoystick = () => {
+         if (mediaQuery.matches) {
+            createJoystick()
+         } else {
+            destroyJoystick()
          }
       }
-   }, [isTabletOrMobile])
+
+      zone?.addEventListener('pointerdown', stopJoystickPointerEvent)
+      zone?.addEventListener('pointermove', stopJoystickPointerEvent)
+      zone?.addEventListener('pointerup', stopJoystickPointerEvent)
+      zone?.addEventListener('touchstart', stopJoystickPointerEvent)
+      zone?.addEventListener('touchmove', stopJoystickPointerEvent)
+      zone?.addEventListener('touchend', stopJoystickPointerEvent)
+      mediaQuery.addEventListener('change', syncJoystick)
+      syncJoystick()
+
+      return () => {
+         mediaQuery.removeEventListener('change', syncJoystick)
+         zone?.removeEventListener('pointerdown', stopJoystickPointerEvent)
+         zone?.removeEventListener('pointermove', stopJoystickPointerEvent)
+         zone?.removeEventListener('pointerup', stopJoystickPointerEvent)
+         zone?.removeEventListener('touchstart', stopJoystickPointerEvent)
+         zone?.removeEventListener('touchmove', stopJoystickPointerEvent)
+         zone?.removeEventListener('touchend', stopJoystickPointerEvent)
+         destroyJoystick()
+      }
+   }, [])
 
    return inputs
 }

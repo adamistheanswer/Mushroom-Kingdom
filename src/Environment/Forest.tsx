@@ -48,49 +48,65 @@ const useFBXHandler = (url, scale) => {
    return clonedModel
 }
 
+const getModelScale = (url) =>
+   url.includes('Plant') || url.includes('Flowers') || url.includes('Grass') ? 0.1 : url.includes('Log') ? 0.2 : 0.5
+
+const SceneryModelGroup = ({ modelUrl, entities }) => {
+   const model = useFBXHandler(modelUrl, getModelScale(modelUrl))
+   const objects = useMemo(
+      () =>
+         entities.map((entity) => ({
+            entity,
+            object: model.clone(),
+            position: new Vector3(entity[1], 0, entity[2]),
+         })),
+      [entities, model]
+   )
+
+   return (
+      <>
+         {objects.map(({ entity, object, position }) => (
+            <primitive
+               key={entity.toString()}
+               rotation={[0, entity[4], 0]}
+               scale={entity[3]}
+               position={position}
+               object={object}
+            />
+         ))}
+      </>
+   )
+}
+
 const Forest = () => {
    const largeScenery = useSceneryStore((state) => state.largeScenery)
    const smallScenery = useSceneryStore((state) => state.smallScenery)
 
-   const cachedModels = useMemo(() => {
-      const models = {}
-      Object.values(modelUrlMap).forEach((url) => {
-         const scale =
-            url.includes('Plant') || url.includes('Flowers') || url.includes('Grass')
-               ? 0.1
-               : url.includes('Log')
-               ? 0.2
-               : 0.5
-         models[url] = useFBXHandler(url, scale)
-      })
-      return models
-   }, [])
+   const sceneryByModel = useMemo(() => {
+      const groups = new Map()
 
-   function createObjects(sceneryData) {
-      return sceneryData.map((entity) => {
-         const idx = entity[0]
-         if (sceneryData.length === 400) idx + 13
-         const pos = new Vector3(entity[1], 0, entity[2])
-         const modelUrl = modelUrlMap[idx]
-         return (
-            <primitive
-               rotation={[0, entity[4], 0]}
-               scale={entity[3]}
-               key={entity.toString()}
-               position={pos}
-               object={cachedModels[modelUrl].clone()}
-            />
-         )
-      })
-   }
+      ;[...largeScenery, ...smallScenery].forEach((entity) => {
+         const modelUrl = modelUrlMap[entity[0]]
 
-   const objectsLRG = createObjects(largeScenery)
-   const objectsSML = createObjects(smallScenery)
+         if (!modelUrl) {
+            return
+         }
+
+         if (!groups.has(modelUrl)) {
+            groups.set(modelUrl, [])
+         }
+
+         groups.get(modelUrl).push(entity)
+      })
+
+      return Array.from(groups.entries())
+   }, [largeScenery, smallScenery])
 
    return (
       <>
-         {objectsLRG}
-         {objectsSML}
+         {sceneryByModel.map(([modelUrl, entities]) => (
+            <SceneryModelGroup key={modelUrl} modelUrl={modelUrl} entities={entities} />
+         ))}
       </>
    )
 }
