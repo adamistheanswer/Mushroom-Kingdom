@@ -19,6 +19,7 @@ import usePlayerActionStore from '../State/playerActionStore'
 
 const LOCAL_CHILD_POSITION = new Vector3(0, 0, 0)
 const LOCAL_CHILD_ROTATION = new Euler(0, 0, 0)
+const DEFAULT_LOCAL_VOICE_STATE = { microphone: false, speaking: false }
 
 function arraysEqual(a: any[], b: any[]): boolean {
    if (a.length !== b.length) return false
@@ -31,7 +32,7 @@ function arraysEqual(a: any[], b: any[]): boolean {
 const LocalPlayerWrapper = ({ clientSocket }) => {
    const localClientId = useUserStore((state) => state.localClientId)
    const localVoiceState = useClientAudioStore((state) =>
-      localClientId ? state.clients[localClientId] : { microphone: false, speaking: false }
+      localClientId ? (state.clients[localClientId] ?? DEFAULT_LOCAL_VOICE_STATE) : DEFAULT_LOCAL_VOICE_STATE
    )
    const selectedMenuAction = usePlayerActionStore((state) => state.selectedMenuAction)
    const arraysEqualMemo = useMemo(() => arraysEqual, [])

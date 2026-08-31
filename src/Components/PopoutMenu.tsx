@@ -46,7 +46,14 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
    const setSelectedMenuAction = usePlayerActionStore((state) => state.setSelectedMenuAction)
 
    const toggleMenu = () => {
-      setMenuOpen(!menuOpen)
+      const nextMenuOpen = !menuOpen
+
+      if (!nextMenuOpen && selectedMenuAction) {
+         setSelectedMenuAction(null)
+         sendButtonAction(playerActionsLookup['stop'])
+      }
+
+      setMenuOpen(nextMenuOpen)
    }
 
    const containerStyle = {
