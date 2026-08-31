@@ -2,6 +2,7 @@ import { useProgress } from '@react-three/drei'
 import React from 'react'
 import UserNameForm from './UserNameForm'
 import PopoutMenu from './PopoutMenu'
+import ChatPanel from './ChatPanel'
 
 interface UserNameFormProps {
    socket: WebSocket
@@ -16,6 +17,7 @@ const OverlayUIWrapper: React.FC<UserNameFormProps> = ({ socket }) => {
             <>
                <UserNameForm socket={socket} />
                <PopoutMenu socket={socket} />
+               <ChatPanel socket={socket} />
             </>
          )}
       </>
