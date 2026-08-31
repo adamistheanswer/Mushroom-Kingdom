@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { Joystick } from 'react-joystick-component'
-
-interface JoystickUpdateEvent {
-   x: number | null
-   y: number | null
-}
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const JOYSTICK_DEADZONE = 0.4
+const JOYSTICK_SIZE = 120
+const JOYSTICK_STICK_SIZE = 64
+const JOYSTICK_RADIUS = JOYSTICK_SIZE / 2
+const JOYSTICK_STICK_MAX_OFFSET = (JOYSTICK_SIZE - JOYSTICK_STICK_SIZE) / 2
 
 const inputs = {
    current: {
@@ -64,40 +62,92 @@ export function useJoystickControls() {
 }
 
 export function MobileJoystick() {
-   const wrapperRef = useRef<HTMLDivElement>(null)
+   const baseRef = useRef<HTMLDivElement>(null)
+   const pointerId = useRef<number | null>(null)
+   const [stickOffset, setStickOffset] = useState({ x: 0, y: 0 })
 
-   const handleMove = useCallback((event: JoystickUpdateEvent) => {
-      setJoystickAxes(event.x ?? 0, event.y ?? 0)
+   const resetJoystick = useCallback(() => {
+      pointerId.current = null
+      setStickOffset({ x: 0, y: 0 })
+      resetJoystickControls()
    }, [])
 
-   useEffect(() => {
-      const stickButton = wrapperRef.current?.querySelector('button')
-      stickButton?.setAttribute('type', 'button')
-      stickButton?.setAttribute('aria-label', 'Movement joystick')
+   const updateJoystickFromPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      const rect = baseRef.current?.getBoundingClientRect()
+      if (!rect) {
+         return
+      }
+
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      const rawX = event.clientX - centerX
+      const rawY = event.clientY - centerY
+      const distance = Math.hypot(rawX, rawY)
+      const limiter = distance > JOYSTICK_RADIUS ? JOYSTICK_RADIUS / distance : 1
+      const x = rawX * limiter
+      const y = rawY * limiter
+      const normalizedX = x / JOYSTICK_RADIUS
+      const normalizedY = -y / JOYSTICK_RADIUS
+
+      setStickOffset({
+         x: normalizedX * JOYSTICK_STICK_MAX_OFFSET,
+         y: -normalizedY * JOYSTICK_STICK_MAX_OFFSET,
+      })
+      setJoystickAxes(normalizedX, normalizedY)
    }, [])
+
+   const handlePointerDown = useCallback(
+      (event: React.PointerEvent<HTMLDivElement>) => {
+         event.preventDefault()
+         event.stopPropagation()
+         pointerId.current = event.pointerId
+         event.currentTarget.setPointerCapture(event.pointerId)
+         updateJoystickFromPointer(event)
+      },
+      [updateJoystickFromPointer]
+   )
+
+   const handlePointerMove = useCallback(
+      (event: React.PointerEvent<HTMLDivElement>) => {
+         if (pointerId.current !== event.pointerId) {
+            return
+         }
+
+         event.preventDefault()
+         event.stopPropagation()
+         updateJoystickFromPointer(event)
+      },
+      [updateJoystickFromPointer]
+   )
+
+   const handlePointerUp = useCallback(
+      (event: React.PointerEvent<HTMLDivElement>) => {
+         if (pointerId.current !== event.pointerId) {
+            return
+         }
+
+         event.preventDefault()
+         event.stopPropagation()
+         resetJoystick()
+      },
+      [resetJoystick]
+   )
+
+   const stickStyle = {
+      transform: `translate(calc(-50% + ${stickOffset.x}px), calc(-50% + ${stickOffset.y}px))`,
+   }
 
    return (
       <div
          id="joystickWrapper1"
-         ref={wrapperRef}
-         onPointerDown={(event) => event.stopPropagation()}
-         onPointerMove={(event) => event.stopPropagation()}
-         onPointerUp={(event) => event.stopPropagation()}
-         onTouchStart={(event) => event.stopPropagation()}
-         onTouchMove={(event) => event.stopPropagation()}
-         onTouchEnd={(event) => event.stopPropagation()}
+         onPointerDown={handlePointerDown}
+         onPointerMove={handlePointerMove}
+         onPointerUp={handlePointerUp}
+         onPointerCancel={handlePointerUp}
       >
-         <Joystick
-            size={120}
-            stickSize={64}
-            baseColor="rgba(0, 50, 0, 0.9)"
-            stickColor="rgba(28, 120, 42, 0.95)"
-            throttle={16}
-            sticky={false}
-            minDistance={8}
-            move={handleMove}
-            stop={resetJoystickControls}
-         />
+         <div ref={baseRef} className="mobileJoystickBase" role="presentation">
+            <div className="mobileJoystickStick" style={stickStyle} />
+         </div>
       </div>
    )
 }

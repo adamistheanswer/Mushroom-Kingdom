@@ -22,6 +22,30 @@ body {
    justify-content: center;
 }
 
+.mobileJoystickBase {
+   position: relative;
+   width: 120px;
+   height: 120px;
+   border: 2px solid darkgreen;
+   border-radius: 50%;
+   background-color: rgba(0, 50, 0, 0.75);
+   box-sizing: border-box;
+   touch-action: none;
+}
+
+.mobileJoystickStick {
+   position: absolute;
+   left: 50%;
+   top: 50%;
+   width: 64px;
+   height: 64px;
+   border-radius: 50%;
+   background-color: rgba(28, 120, 42, 0.95);
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+   pointer-events: none;
+   touch-action: none;
+}
+
 #pingStats {
    position: absolute;
    top: 60px;
