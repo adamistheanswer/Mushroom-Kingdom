@@ -1,4 +1,5 @@
 import { getLargeScenery, getSmallScenery } from '../state/sceneryState.js'
+import { getChatMessages } from '../state/chatState.js'
 import { encode } from '@msgpack/msgpack'
 
 export function sendClientId(client, clientId) {
@@ -23,6 +24,15 @@ export function sendSmallScenery(client) {
    const response = {
       type: 'smallScenery',
       payload: getSmallScenery(),
+   }
+   const encodedResponse = encode(response)
+   client.send(encodedResponse)
+}
+
+export function sendChatMessages(client) {
+   const response = {
+      type: 'chatMessages',
+      payload: getChatMessages(),
    }
    const encodedResponse = encode(response)
    client.send(encodedResponse)

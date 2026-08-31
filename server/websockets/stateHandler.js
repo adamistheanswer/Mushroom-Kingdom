@@ -1,5 +1,6 @@
 import { setClient, getClient } from '../state/clientState.js'
-import { broadcastClientVoiceChatStatusUpdate, markClientUpdated } from './broadcastHandler.js'
+import { addChatMessage } from '../state/chatState.js'
+import { broadcastChatMessage, broadcastClientVoiceChatStatusUpdate, markClientUpdated } from './broadcastHandler.js'
 
 const PLAYER_WORLD_LIMIT = 485
 
@@ -96,4 +97,16 @@ export function handleStateSetPlayerMovement(clientId, message) {
    clientData.action = action
    setClient(clientId, clientData)
    markClientUpdated(clientId)
+}
+
+export function handleChatMessage(clientId, message) {
+   const clientData = getClient(clientId)
+   if (!clientData) return
+
+   const chatMessage = addChatMessage(clientId, clientData, message.payload?.text)
+   if (!chatMessage) {
+      return
+   }
+
+   broadcastChatMessage(chatMessage)
 }

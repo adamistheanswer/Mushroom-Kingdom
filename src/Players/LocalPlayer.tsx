@@ -31,7 +31,12 @@ function arraysEqual(a: any[], b: any[]): boolean {
    return true
 }
 
-const LocalPlayerWrapper = ({ clientSocket }) => {
+interface LocalPlayerWrapperProps {
+   clientSocket: WebSocket
+   showSpawnEffect?: boolean
+}
+
+const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, showSpawnEffect = true }) => {
    const localClientId = useUserStore((state) => state.localClientId)
    const localVoiceState = useClientAudioStore((state) =>
       localClientId ? (state.clients[localClientId] ?? DEFAULT_LOCAL_VOICE_STATE) : DEFAULT_LOCAL_VOICE_STATE
@@ -199,7 +204,7 @@ const LocalPlayerWrapper = ({ clientSocket }) => {
 
    return (
       <group ref={groupRef}>
-         <SpawnEffect />
+         {showSpawnEffect && <SpawnEffect />}
          <NamePlate
             key={localClientId}
             position={LOCAL_CHILD_POSITION}

@@ -1,9 +1,10 @@
 import { setClient, removeClient, getClientsAsMap } from '../state/clientState.js'
 import { getLargeScenery, setLargeScenery, getSmallScenery, setSmallScenery } from '../state/sceneryState.js'
+import { clearChatMessages, markChatMessagesDisconnected } from '../state/chatState.js'
 import { decode } from '@msgpack/msgpack'
 import { uid } from '../utils/utils.js'
 import { generateLargeScenery, generateSmallScenery } from '../utils/generateScenery.js'
-import { sendClientId, sendLargeScenery, sendSmallScenery } from './InitialisationHander.js'
+import { sendChatMessages, sendClientId, sendLargeScenery, sendSmallScenery } from './InitialisationHander.js'
 import {
    broadcastActiveClients,
    broardcastClientDisconnect,
@@ -15,6 +16,7 @@ import {
    handleStateSetPlayerMovement,
    handleStateSetVoiceChatStatus,
    handleStateSetUserName,
+   handleChatMessage,
 } from './stateHandler.js'
 import { handleSignalMessage } from './signalHandler.js'
 
@@ -23,6 +25,7 @@ const STATE_SET_CLIENT_ACTION = 'state_set_client_action'
 const STATE_SET_CLIENT_MOVEMENT = 'move'
 const STATE_SET_VOICE_CHAT_STATUS = 'state_set_client_voice_chat_status'
 const HEARTBEAT = 'heartbeat'
+const CHAT = 'chat'
 
 export function handleConnection(socket) {
    const clientId = uid()
@@ -51,6 +54,7 @@ export function handleConnection(socket) {
 
    sendLargeScenery(socket)
    sendSmallScenery(socket)
+   sendChatMessages(socket)
 
    socket.on('message', (data) => {
       const message = decode(data)
@@ -70,6 +74,9 @@ export function handleConnection(socket) {
          case 'signal':
             handleSignalMessage(message)
             break
+         case CHAT:
+            handleChatMessage(clientId, message)
+            break
          case HEARTBEAT:
             break
       }
@@ -85,8 +92,10 @@ function handleDisconnection(socket, clientId) {
       if (getClientsAsMap().size === 1) {
          setLargeScenery([])
          setSmallScenery([])
+         clearChatMessages()
       }
 
+      markChatMessagesDisconnected(clientId)
       removeClient(clientId)
       broardcastClientDisconnect(clientId)
    })

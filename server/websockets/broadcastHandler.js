@@ -110,6 +110,15 @@ export function broadcastClientVoiceChatStatusUpdate(clientId, voiceChatEnabled)
    broadcastEncoded(encodedResponse)
 }
 
+export function broadcastChatMessage(chatMessage) {
+   const response = {
+      type: 'chatMessage',
+      payload: chatMessage,
+   }
+   const encodedResponse = encode(response)
+   broadcastEncoded(encodedResponse)
+}
+
 export function getClientSocketById(clientId) {
    return [...wsServer.clients].find((client) => clientId === client.clientId)
 }

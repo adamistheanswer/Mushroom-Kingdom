@@ -1,8 +1,9 @@
-import React, { useEffect, Suspense, useState } from 'react'
+import React, { useCallback, useEffect, Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerspectiveCamera, Stats } from '@react-three/drei'
 import Lighting from './Environment/Lighting'
 import Ground from './Environment/Ground'
+import Grass from './Environment/Grass'
 import Forest from './Environment/Forest'
 import BoundaryWalls from './Environment/BoundaryWalls'
 import Loader from './Components/Loader'
@@ -17,6 +18,9 @@ import { PCFShadowMap } from 'three'
 import { PlayerPositionUpdate, PlayerSnapshotData, usePlayerPositionsStore } from './State/playerPositionsStore'
 import useClientAudioStore from './State/clientsAudioStore'
 import { MobileJoystick } from './Utils/useJoystickControls'
+import { useChatStore } from './State/chatStore'
+
+const canvasGlOptions = { powerPreference: 'high-performance' } as const
 
 function createSocket() {
    const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
@@ -30,8 +34,19 @@ interface WebSocketMessage {
    payload: any
 }
 
+function SceneReadySignal({ onReady }: { onReady: () => void }) {
+   useEffect(() => {
+      const frameId = window.requestAnimationFrame(onReady)
+      return () => window.cancelAnimationFrame(frameId)
+   }, [onReady])
+
+   return null
+}
+
 const App: React.FC = () => {
    const [socket, setSocket] = useState<WebSocket | null>(null)
+   const [sceneReady, setSceneReady] = useState(false)
+   const [localSpawnEffectReady, setLocalSpawnEffectReady] = useState(false)
    const setClientId = useUserStore((state) => state.setClientId)
    const setLargeScenery = useSceneryStore((state) => state.setLargeScenery)
    const setSmallScenery = useSceneryStore((state) => state.setSmallScenery)
@@ -41,6 +56,25 @@ const App: React.FC = () => {
    const setAudioClients = useClientAudioStore((state) => state.setClients)
    const updateAudioClientsFromDeltas = useClientAudioStore((state) => state.updateClientsFromDeltas)
    const removeAudioClient = useClientAudioStore((state) => state.removeClient)
+   const setChatMessages = useChatStore((state) => state.setMessages)
+   const addChatMessage = useChatStore((state) => state.addMessage)
+   const markChatClientDisconnected = useChatStore((state) => state.markClientDisconnected)
+   const clearChatMessages = useChatStore((state) => state.clearMessages)
+
+   const handleSceneReady = useCallback(() => {
+      setSceneReady(true)
+   }, [])
+
+   useEffect(() => {
+      if (!socket || !sceneReady) {
+         setLocalSpawnEffectReady(false)
+         return
+      }
+
+      setLocalSpawnEffectReady(false)
+      const frameId = window.requestAnimationFrame(() => setLocalSpawnEffectReady(true))
+      return () => window.cancelAnimationFrame(frameId)
+   }, [sceneReady, socket])
 
    useEffect(() => {
       let reconnectTimeout: number | undefined
@@ -70,6 +104,7 @@ const App: React.FC = () => {
          const nextSocket = createSocket()
          activeSocket = nextSocket
          setSocket(nextSocket)
+         setLocalSpawnEffectReady(false)
 
          const handleOpen = () => {
             clearHeartbeat()
@@ -132,6 +167,15 @@ const App: React.FC = () => {
             if (message.type === 'clientDisconnect') {
                removeDisconnectedPlayer(message.payload)
                removeAudioClient(message.payload)
+               markChatClientDisconnected(message.payload)
+            }
+
+            if (message.type === 'chatMessages') {
+               setChatMessages(message.payload)
+            }
+
+            if (message.type === 'chatMessage') {
+               addChatMessage(message.payload)
             }
          }
 
@@ -140,6 +184,8 @@ const App: React.FC = () => {
             if (!closingForUnmount) {
                setSocket(null)
                setClientId('')
+               setLocalSpawnEffectReady(false)
+               clearChatMessages()
                reconnectTimeout = window.setTimeout(connect, 1000)
             }
          }
@@ -166,6 +212,7 @@ const App: React.FC = () => {
       return () => {
          closingForUnmount = true
          clearHeartbeat()
+         clearChatMessages()
 
          if (reconnectTimeout) {
             window.clearTimeout(reconnectTimeout)
@@ -187,20 +234,26 @@ const App: React.FC = () => {
       updateAudioClientsFromDeltas,
       updatePlayerDeltas,
       updatePlayerPositions,
+      setChatMessages,
+      addChatMessage,
+      markChatClientDisconnected,
+      clearChatMessages,
    ])
 
    return (
       <div style={{ width: '100%', height: '100vh' }}>
-         <Canvas shadows={{ type: PCFShadowMap }}>
+         <Canvas dpr={[1, 1.5]} gl={canvasGlOptions} shadows={{ type: PCFShadowMap }}>
             {/* <Stats /> */}
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
             <color attach="background" args={['black']} />
             <fog attach="fog" color="black" near={50} far={300} />
             <Lighting />
             <Suspense fallback={<Loader />}>
+               <SceneReadySignal onReady={handleSceneReady} />
                {socket && <RemotePlayers clientSocket={socket} />}
-               {socket && <LocalPlayer clientSocket={socket} />}
+               {socket && <LocalPlayer clientSocket={socket} showSpawnEffect={localSpawnEffectReady} />}
                <Ground />
+               <Grass />
                <Forest />
                <BoundaryWalls />
             </Suspense>

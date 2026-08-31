@@ -59,7 +59,8 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
    const containerStyle = {
       position: 'fixed',
       left: '20px',
-      bottom: '20px',
+      top: '20px',
+      zIndex: 30,
    }
 
    const mainButtonStyle = {
@@ -105,7 +106,7 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
       display: 'grid',
       gridTemplateColumns: 'repeat(2, 1fr)',
       gridGap: '10px',
-      bottom: '60px',
+      top: '60px',
       transition: 'all 0.3s',
       ...(menuOpen ? openMenuStyle : closedMenuStyle),
    }
@@ -149,7 +150,7 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
 
    return (
       //@ts-ignore
-      <div style={containerStyle}>
+      <div className="popout-menu" style={containerStyle}>
          <button
             style={mainButtonStyle}
             onClick={toggleMenu}

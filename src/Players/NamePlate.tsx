@@ -1,8 +1,9 @@
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useMemo, useState } from 'react'
 import { Text } from '@react-three/drei'
 import { Group, Mesh, Vector3 } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { decode } from '@msgpack/msgpack'
+import { CHAT_BUBBLE_DURATION_MS, CHAT_BUBBLE_FADE_MS, useChatStore } from '../State/chatStore'
 
 interface NamePlateProps {
    position: Vector3
@@ -34,8 +35,32 @@ export const NamePlate = React.memo<NamePlateProps>(
       const micLevelRefs = useRef<Mesh[]>([])
       const nameplateHeight = 13
       const [socketUserName, setSocketUserName] = useState('')
+      const [now, setNow] = useState(Date.now())
+      const messages = useChatStore((state) => state.messages)
 
       const { camera } = useThree()
+      const latestChatMessage = useMemo(() => {
+         const cutoff = now - CHAT_BUBBLE_DURATION_MS
+
+         for (let index = messages.length - 1; index >= 0; index--) {
+            const message = messages[index]
+            if (message.clientId === clientId && message.createdAt >= cutoff) {
+               return message
+            }
+         }
+
+         return null
+      }, [clientId, messages, now])
+      const bubbleAge = latestChatMessage ? now - latestChatMessage.createdAt : CHAT_BUBBLE_DURATION_MS
+      const bubbleFadeProgress = Math.max(0, bubbleAge - (CHAT_BUBBLE_DURATION_MS - CHAT_BUBBLE_FADE_MS)) / CHAT_BUBBLE_FADE_MS
+      const bubbleOpacity = latestChatMessage ? Math.max(0, 1 - bubbleFadeProgress) : 0
+      const bubbleWidth = latestChatMessage ? Math.min(16, Math.max(6, latestChatMessage.text.length * 0.38)) : 6
+      const bubbleHeight = latestChatMessage ? Math.max(2.2, Math.ceil(latestChatMessage.text.length / 24) * 1.08 + 1) : 2.2
+
+      useEffect(() => {
+         const interval = window.setInterval(() => setNow(Date.now()), 250)
+         return () => window.clearInterval(interval)
+      }, [])
 
       useEffect(() => {
          if (userName !== undefined) {
@@ -96,6 +121,25 @@ export const NamePlate = React.memo<NamePlateProps>(
 
       return (
          <group ref={nameplateRef}>
+            {latestChatMessage && (
+               <group position={[0, 2.5 + bubbleHeight / 2, 0]}>
+                  <mesh position={[0, 0, -0.04]}>
+                     <planeGeometry args={[bubbleWidth, bubbleHeight]} />
+                     <meshBasicMaterial color="#10291d" transparent opacity={bubbleOpacity * 0.88} depthWrite={false} />
+                  </mesh>
+                  <Text
+                     fontSize={0.95}
+                     color="white"
+                     fillOpacity={bubbleOpacity}
+                     anchorX="center"
+                     anchorY="middle"
+                     maxWidth={bubbleWidth - 1}
+                     textAlign="center"
+                  >
+                     {latestChatMessage.text}
+                  </Text>
+               </group>
+            )}
             <Text fontSize={1} color={isLocal ? 'yellow' : 'white'} anchorX="center" anchorY="middle">
                {userName || socketUserName || clientId}
             </Text>
