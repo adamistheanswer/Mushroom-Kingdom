@@ -33,7 +33,7 @@ const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      position: 'absolute',
+      position: 'fixed',
       top: isMobile ? 'max(20px, env(safe-area-inset-top))' : '10px',
       left: isMobile ? '84px' : '50%',
       right: isMobile ? '84px' : 'auto',
