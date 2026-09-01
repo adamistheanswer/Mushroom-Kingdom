@@ -29,7 +29,7 @@ let lastOutboundBytesSampleTime = performance.now()
 let lastOutboundBytesSampleTotal = 0
 let outboundBytesPerSecond = 0
 
-function getPayloadByteLength(data) {
+export function getPayloadByteLength(data) {
    if (typeof data === 'string') {
       return Buffer.byteLength(data)
    }
@@ -66,6 +66,19 @@ function recordClientUpdateTick(startTime, updateCount, recipients = 0, entriesS
    websocketMetrics.lastClientUpdateEntriesSent = entriesSent
    websocketMetrics.lastClientUpdateBytes = bytesSent
    websocketMetrics.lastAverageVisiblePlayersPerClient = connectedClients > 0 ? entriesSent / connectedClients : 0
+}
+
+// Signalling looks sockets up per message, so keep an index instead of scanning every client.
+const clientSockets = new Map()
+
+export function registerClientSocket(clientId, socket) {
+   clientSockets.set(clientId, socket)
+}
+
+export function unregisterClientSocket(clientId, socket) {
+   if (clientSockets.get(clientId) === socket) {
+      clientSockets.delete(clientId)
+   }
 }
 
 export function markClientUpdatesDirty() {
@@ -220,7 +233,7 @@ export function broadcastChatMessage(chatMessage) {
 }
 
 export function getClientSocketById(clientId) {
-   return [...wsServer.clients].find((client) => clientId === client.clientId)
+   return clientSockets.get(clientId)
 }
 
 export function getWebSocketDebugStats() {

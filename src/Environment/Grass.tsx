@@ -109,21 +109,29 @@ const DESKTOP_QUALITY: QualityProfile = {
    targetFrameTime: 1 / 58,
 }
 
-// Mobile cannot afford desktop's blade count, so it buys coverage with blade size instead:
-// fewer, wider, slightly taller blades fill the same ground for a fraction of the vertex work.
-// Width is close to free - it costs nothing per vertex - whereas every extra blade is another
-// instance to transform.
+// Mobile runs the same two-segment blade as desktop, just fewer of them. Segment count is the
+// one dial here that changes what the grass *is* rather than how much of it there is: a single
+// segment blade is a rigid triangle that cannot curve under wind, and it collapses the whole
+// peaked trample profile into a flat tip-over, so a handheld field of them reads as a different
+// asset from the desktop one no matter how densely it is packed. Two segments costs five
+// vertices per blade instead of three, and that is the right place to spend the budget.
+//
+// The rest of the profile pays for it. Blade count stays below desktop's, and the width margin
+// left over covers the shortfall - width is free per vertex, where every extra blade is another
+// instance to transform. The adaptive density loop below is the real safety net: a device that
+// cannot hold the frame budget thins the field rather than dropping back to flat blades, and
+// minDensity keeps its worst case above what the old, wider profile drew at full strength.
 const MOBILE_QUALITY: QualityProfile = {
-   nearBlades: 300000,
-   nearChunks: 6,
-   farBlades: 90000,
-   farChunks: 2,
-   bladeSegments: 1,
-   bladeWidthScale: 1.34,
-   bladeHeightScale: 1.06,
-   fieldMapSize: 512,
-   trampleMapSize: 320,
-   minDensity: 0.4,
+   nearBlades: 400000,
+   nearChunks: 7,
+   farBlades: 140000,
+   farChunks: 3,
+   bladeSegments: 2,
+   bladeWidthScale: 1.1,
+   bladeHeightScale: 1,
+   fieldMapSize: 640,
+   trampleMapSize: 512,
+   minDensity: 0.45,
    targetFrameTime: 1 / 50,
 }
 
@@ -353,8 +361,8 @@ const vertexShader = `
       // past the edge of the contact. That hook is the shape grass actually takes around
       // something standing in it, and it is what the single peaked profile below draws.
       //
-      // Only the tip value matters to a single-segment blade, so the far ring and the mobile
-      // LOD tip rigidly either way and see none of this.
+      // Only the tip value matters to a single-segment blade, so the far ring tips rigidly
+      // either way and sees none of this.
       float leanProfile = t * (2.0 - t);
       float pressedProfile = t * (3.36 - 2.81 * t);
       float displacementTip = mix(leanProfile, pressedProfile, smoothstep(0.45, 0.95, displacementAmount));
@@ -647,8 +655,8 @@ function createWindTexture() {
 
 /**
  * A blade is `segments` stacked quads capped with a tip triangle. One segment is a flat
- * triangle - the mobile and distance LOD - while two or more curve properly once the vertex
- * shader bends each row by a progressively larger angle.
+ * triangle - the distance LOD - while two or more curve properly once the vertex shader bends
+ * each row by a progressively larger angle.
  */
 function createBladeShape(segments: number) {
    const shapes: number[] = []

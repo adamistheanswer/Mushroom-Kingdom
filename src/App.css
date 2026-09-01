@@ -7,6 +7,9 @@
    --mk-joystick-height: 140px;
    /* Set from the visual viewport so the composer rides above the keyboard. */
    --mk-keyboard-inset: 0px;
+   --mk-viewport-height: 100vh;
+   /* Bottom of the stack that rides on top of the composer while the keyboard is open. */
+   --mk-typing-bottom: calc(var(--mk-safe-bottom) + var(--mk-keyboard-inset) + var(--mk-composer-height) + 8px);
 }
 
 /* The scene renders on a black background, so anything the browser paints around the
@@ -225,15 +228,14 @@ body {
 
    /* Message bar spans the very bottom, under both the joystick and the toggle. */
    .chat-panel__form {
-      position: absolute;
+      position: fixed;
       right: max(14px, env(safe-area-inset-right));
-      bottom: var(--mk-safe-bottom);
-      /* Lift with a transform rather than by shifting `bottom`: Safari defers layout
-         inside fixed subtrees while the keyboard animates in, so a `bottom` that
-         depends on the inset can repaint a beat late (or not until the next scroll),
-         leaving the bar behind the keyboard. Transforms composite every frame. */
-      transform: translateY(calc(-1 * var(--mk-keyboard-inset)));
+      bottom: 0;
       left: max(14px, env(safe-area-inset-left));
+      /* Transform rather than bottom: iOS repaints a composited layer reliably and
+         keeps the bar in step with the keyboard instead of settling a beat late. */
+      transform: translateY(calc(-1 * (var(--mk-safe-bottom) + var(--mk-keyboard-inset))));
+      will-change: transform;
       gap: 6px;
       margin-top: 0;
       pointer-events: auto;
@@ -304,6 +306,16 @@ body {
       pointer-events: auto;
    }
 
+   /* The keyboard swallows the joystick row, so the toggle and the log stack straight
+      on top of the composer while typing instead of sitting behind it. */
+   html[data-mk-typing] .chat-panel__toggle {
+      bottom: var(--mk-typing-bottom);
+   }
+
+   html[data-mk-typing] .chat-panel__log {
+      bottom: calc(var(--mk-typing-bottom) + 58px);
+   }
+
    .chat-panel__log-header {
       display: flex;
       align-items: center;
@@ -332,7 +344,8 @@ body {
    }
 
    .chat-panel__messages {
-      max-height: min(34vh, 210px);
+      /* Tracks the visible height so the log stays clear of the keyboard. */
+      max-height: min(calc(var(--mk-viewport-height) * 0.34), 210px);
       padding: 0;
       border: none;
       border-radius: 0;
