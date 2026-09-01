@@ -10,6 +10,9 @@ import {
    broardcastClientDisconnect,
    markClientUpdated,
    broadcastClientUpdates,
+   broadcastWebSocketDebugStats,
+   recordInboundWebSocketMessage,
+   recordWebSocketDecodeError,
 } from './broadcastHandler.js'
 import {
    handleStateSetPlayerAction,
@@ -26,6 +29,7 @@ const STATE_SET_CLIENT_MOVEMENT = 'move'
 const STATE_SET_VOICE_CHAT_STATUS = 'state_set_client_voice_chat_status'
 const HEARTBEAT = 'heartbeat'
 const CHAT = 'chat'
+const DEBUG_SUBSCRIBE = 'debug_subscribe'
 
 export function handleConnection(socket) {
    const clientId = uid()
@@ -57,7 +61,18 @@ export function handleConnection(socket) {
    sendChatMessages(socket)
 
    socket.on('message', (data) => {
-      const message = decode(data)
+      recordInboundWebSocketMessage(data)
+
+      let message
+
+      try {
+         message = decode(data)
+      } catch (error) {
+         recordWebSocketDecodeError()
+         console.error(`Unable to decode message from ${clientId}:`, error)
+         return
+      }
+
       switch (message.type) {
          case STATE_SET_USERNAME:
             handleStateSetUserName(clientId, message)
@@ -78,6 +93,9 @@ export function handleConnection(socket) {
             handleChatMessage(clientId, message)
             break
          case HEARTBEAT:
+            break
+         case DEBUG_SUBSCRIBE:
+            socket.debugSubscribed = process.env.NODE_ENV !== 'production' && Boolean(message.payload?.enabled)
             break
       }
    })
@@ -102,6 +120,7 @@ function handleDisconnection(socket, clientId) {
 }
 
 let clientUpdatesInterval = null
+let debugStatsInterval = null
 
 export function startSendingClientUpdates(intervalMs = 50) {
    if (clientUpdatesInterval) {
@@ -110,9 +129,23 @@ export function startSendingClientUpdates(intervalMs = 50) {
    clientUpdatesInterval = setInterval(broadcastClientUpdates, intervalMs)
 }
 
+export function startSendingDebugStats(intervalMs = 1000) {
+   if (debugStatsInterval) {
+      stopSendingDebugStats()
+   }
+   debugStatsInterval = setInterval(broadcastWebSocketDebugStats, intervalMs)
+}
+
 function stopSendingClientUpdates() {
    if (clientUpdatesInterval) {
       clearInterval(clientUpdatesInterval)
       clientUpdatesInterval = null
+   }
+}
+
+function stopSendingDebugStats() {
+   if (debugStatsInterval) {
+      clearInterval(debugStatsInterval)
+      debugStatsInterval = null
    }
 }

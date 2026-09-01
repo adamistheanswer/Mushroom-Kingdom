@@ -186,8 +186,10 @@ function getCurrentAssetName(item?: string) {
 
 export default function Loader() {
    const { active, errors, item, loaded, progress, total } = useProgress()
-   const roundedProgress = Math.max(0, Math.min(100, Math.round(progress || 0)))
-   const phaseIndex = Math.min(loadingPhases.length - 1, Math.floor((roundedProgress / 100) * loadingPhases.length))
+   const isComplete = !active || (total > 0 && loaded >= total)
+   const barProgress = isComplete ? 100 : Math.max(0, Math.min(99.9, progress || 0))
+   const displayedProgress = isComplete ? 100 : Math.max(0, Math.min(99, Math.floor(progress || 0)))
+   const phaseIndex = Math.min(loadingPhases.length - 1, Math.floor((barProgress / 100) * loadingPhases.length))
    const phase = active ? loadingPhases[phaseIndex] : 'Forest ready'
    const assetCount = total > 0 ? `${loaded}/${total} assets` : `${loaded} assets`
    const currentItem = active ? getCurrentAssetName(item) : 'Scene loaded'
@@ -217,11 +219,11 @@ export default function Loader() {
          <LoadingText>
             {phase}
             <LoadingDetail>
-               <span>{roundedProgress}%</span>
+               <span>{displayedProgress}%</span>
                <span>{assetCount}</span>
             </LoadingDetail>
             <ProgressTrack>
-               <ProgressFill $progress={roundedProgress} />
+               <ProgressFill $progress={barProgress} />
             </ProgressTrack>
             <CurrentItem title={currentItem}>{currentItem}</CurrentItem>
             {errors.length > 0 && <ErrorText>{errors.length} asset issue{errors.length === 1 ? '' : 's'} detected</ErrorText>}

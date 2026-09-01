@@ -9,8 +9,17 @@
    --mk-keyboard-inset: 0px;
 }
 
+/* The scene renders on a black background, so anything the browser paints around the
+   canvas (rubber band overscroll, the strip behind a collapsing Safari toolbar, the gap
+   while the keyboard animates) matches it instead of flashing white. */
+html {
+   background-color: #000;
+   color-scheme: dark;
+}
+
 body {
    margin: 0;
+   background-color: #000;
    overflow: hidden;
    -webkit-overflow-scrolling: touch;
    overscroll-behavior: none;
@@ -218,7 +227,12 @@ body {
    .chat-panel__form {
       position: absolute;
       right: max(14px, env(safe-area-inset-right));
-      bottom: calc(var(--mk-safe-bottom) + var(--mk-keyboard-inset));
+      bottom: var(--mk-safe-bottom);
+      /* Lift with a transform rather than by shifting `bottom`: Safari defers layout
+         inside fixed subtrees while the keyboard animates in, so a `bottom` that
+         depends on the inset can repaint a beat late (or not until the next scroll),
+         leaving the bar behind the keyboard. Transforms composite every frame. */
+      transform: translateY(calc(-1 * var(--mk-keyboard-inset)));
       left: max(14px, env(safe-area-inset-left));
       gap: 6px;
       margin-top: 0;

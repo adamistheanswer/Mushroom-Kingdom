@@ -15,19 +15,18 @@ import {
    ShaderMaterial,
    Sphere,
    UnsignedByteType,
+   UniformsLib,
+   UniformsUtils,
    Vector2,
    Vector3,
    Vector4,
 } from 'three'
-import { WORLD_HALF_SIZE } from '../constants'
+import { MOONLIGHT_OFFSET, WORLD_HALF_SIZE } from '../constants'
+import { isHandheldDevice } from '../Utils/isHandheldDevice'
+import { FOG_FAR, FOG_NEAR, SCENE_FOG_COLOR } from './sceneQuality'
 import { usePlayerPositionsStore } from '../State/playerPositionsStore'
-import { createTerrainNoise, getTerrainHeightAtWorld } from './terrain'
-import type { TerrainNoise } from './terrain'
-
-// The scene fog fades everything to the black background by FOG_FAR, so a blade past it can
-// only ever draw pure black. Every patch below is sized against that horizon.
-const FOG_NEAR = 50
-const FOG_FAR = 300
+import { createTerrainNoise, fbm, getTerrainHeightAtWorld } from './terrain'
+import { createTrampleField } from './TrampleField'
 
 const NEAR_PATCH_SIZE = 400
 const NEAR_PATCH_HALF_SIZE = NEAR_PATCH_SIZE / 2
@@ -45,14 +44,16 @@ const FAR_FADE_START = FOG_FAR * 0.7
 const FAR_FADE_END = FOG_FAR
 
 const SPAWN_THIN_RADIUS = 18
-const MAX_GRASS_DISPLACERS = 8
-const GRASS_DISPLACER_RADIUS = 7
-const GRASS_DISPLACER_STRENGTH = 1.05
-const GRASS_WAKE_RADIUS = 11
-const GRASS_WAKE_WIDTH = 4.8
-const GRASS_WAKE_STRENGTH = 2
-const GRASS_IDLE_FOOTPRINT_STRENGTH = 3
-const GRASS_LOCAL_PARTING_STRENGTH = 3
+
+// How far over a blade goes when it is shouldered aside, and when it is stood on. A full push
+// is a right angle on purpose: paired with the peaked profile in the shader it puts the middle
+// of the blade flat on the floor, which is what lets the tip read as lifting back up rather
+// than as the whole stem simply leaning. Crushing goes past that, and squashes what is left of
+// the height with it - the difference between grass brushed aside and grass flattened.
+const GRASS_BEND_ANGLE = 90
+const GRASS_CRUSH_ANGLE = 93
+const GRASS_BEND_SQUASH = 0.58
+const GRASS_CRUSH_SQUASH = 0.34
 
 const WIND_MAP_SIZE = 256
 const WIND_SWAY_WORLD_SCALE = 0.0125
@@ -66,7 +67,19 @@ const WIND_GUST_SCROLL = WIND_GUST_WORLD_SCALE * 8.8
 const WIND_SWAY_BLADE_JITTER = 0.003
 
 // Matches the directional light in Environment/Lighting.
-const SUN_DIRECTION = new Vector3(-240, 300, 0).normalize()
+const SUN_DIRECTION = new Vector3(...MOONLIGHT_OFFSET).normalize()
+const GRASS_FOG_COLOR = hexColorToShaderVector(SCENE_FOG_COLOR)
+
+function hexColorToShaderVector(hexColor: string) {
+   const hex = hexColor.replace('#', '')
+   const value = Number.parseInt(hex, 16)
+
+   return new Vector3(
+      ((value >> 16) & 255) / 255,
+      ((value >> 8) & 255) / 255,
+      (value & 255) / 255
+   )
+}
 
 interface QualityProfile {
    nearBlades: number
@@ -77,7 +90,7 @@ interface QualityProfile {
    bladeWidthScale: number
    bladeHeightScale: number
    fieldMapSize: number
-   maxDisplacers: number
+   trampleMapSize: number
    minDensity: number
    targetFrameTime: number
 }
@@ -91,7 +104,7 @@ const DESKTOP_QUALITY: QualityProfile = {
    bladeWidthScale: 1,
    bladeHeightScale: 1,
    fieldMapSize: 768,
-   maxDisplacers: MAX_GRASS_DISPLACERS,
+   trampleMapSize: 640,
    minDensity: 0.5,
    targetFrameTime: 1 / 58,
 }
@@ -109,36 +122,23 @@ const MOBILE_QUALITY: QualityProfile = {
    bladeWidthScale: 1.34,
    bladeHeightScale: 1.06,
    fieldMapSize: 512,
-   maxDisplacers: 4,
+   trampleMapSize: 320,
    minDensity: 0.4,
    targetFrameTime: 1 / 50,
 }
 
-/**
- * Picks the blade budget once, at mount, and never revisits it. This deliberately does not use
- * the viewport-width useIsMobile hook the UI uses: a phone turned to landscape is wider than
- * 640px but is still a phone, and re-deciding mid-session would rebuild every vertex buffer
- * and the field texture in one frame. Device class is the right axis here, and the adaptive
- * density loop below absorbs whatever this guess gets wrong.
- */
+// The adaptive density loop below absorbs whatever this one-shot guess gets wrong.
 function detectQualityProfile(): QualityProfile {
-   const coarsePointer = window.matchMedia('(pointer: coarse)').matches
-   const shortestScreenEdge = Math.min(window.screen.width, window.screen.height)
-
-   return coarsePointer && shortestScreenEdge <= 900 ? MOBILE_QUALITY : DESKTOP_QUALITY
+   return isHandheldDevice() ? MOBILE_QUALITY : DESKTOP_QUALITY
 }
 
 const glsl = {
    worldHalfSize: WORLD_HALF_SIZE.toFixed(1),
    spawnThinRadius: SPAWN_THIN_RADIUS.toFixed(1),
-   displacerStrength: GRASS_DISPLACER_STRENGTH.toFixed(2),
-   wakeInner: (GRASS_WAKE_RADIUS * 0.58).toFixed(1),
-   wakeOuter: GRASS_WAKE_RADIUS.toFixed(1),
-   wakeInnerWidth: (GRASS_WAKE_WIDTH * 0.45).toFixed(1),
-   wakeOuterWidth: GRASS_WAKE_WIDTH.toFixed(1),
-   wakeStrength: GRASS_WAKE_STRENGTH.toFixed(2),
-   footprintStrength: GRASS_IDLE_FOOTPRINT_STRENGTH.toFixed(2),
-   partingStrength: GRASS_LOCAL_PARTING_STRENGTH.toFixed(2),
+   bendAngle: GRASS_BEND_ANGLE.toFixed(1),
+   crushAngle: GRASS_CRUSH_ANGLE.toFixed(1),
+   bendSquash: GRASS_BEND_SQUASH.toFixed(2),
+   crushSquash: GRASS_CRUSH_SQUASH.toFixed(2),
    swayScale: WIND_SWAY_WORLD_SCALE.toFixed(5),
    gustScale: WIND_GUST_WORLD_SCALE.toFixed(5),
    swayScroll: WIND_SWAY_SCROLL.toFixed(5),
@@ -179,15 +179,17 @@ const vertexShader = `
    uniform float uWindScale;
    uniform float uDensityScale;
    uniform float uInteractionScale;
-   uniform int uDisplacerCount;
-   uniform vec3 uDisplacers[${MAX_GRASS_DISPLACERS}];
-   uniform vec3 uDisplacerBounds;
-   uniform vec3 uLocalMotion;
+   uniform sampler2D uTrampleMap;
+   // xy - centre of the trample window in world space, z - one over its world size.
+   uniform vec3 uTrampleWindow;
 
    varying vec3 vColor;
    varying float vAlpha;
    varying float vFog;
    varying float vHash;
+
+   #include <common>
+   #include <shadowmap_pars_vertex>
 
    mat3 rotateAroundAxis(vec3 axis, float angle) {
       float s = sin(angle);
@@ -275,6 +277,33 @@ const vertexShader = `
       float width = aBladeMetrics.y * uWidthScale * taper * mix(0.68, 1.0, patchFade) *
          mix(0.88, 1.12, bladeHash) * mix(1.26, 1.0, uDensityScale);
 
+      // Everything a player has done to this patch of ground, in one fetch. The trample map is
+      // written once per frame for every player at once, so this costs the same whether there
+      // is one person in the meadow or fifty, and the loop over displacers it replaces is gone.
+      // Blades outside the window read nothing and skip the fetch entirely.
+      float trampleBend = 0.0;
+      float trampleCrush = 0.0;
+      vec2 trampleDirection = vec2(0.0);
+
+      if (uInteractionScale > 0.01) {
+         vec2 trampleUv = (worldXZ - uTrampleWindow.xy) * uTrampleWindow.z + 0.5;
+         vec2 trampleEdge = min(trampleUv, 1.0 - trampleUv);
+         float windowFade = smoothstep(0.0, 0.04, min(trampleEdge.x, trampleEdge.y)) * uInteractionScale;
+
+         if (windowFade > 0.0) {
+            vec4 trample = texture2D(uTrampleMap, trampleUv);
+
+            // Opposing channels cancel to the net push; whatever was added to all four equally
+            // had no direction at all, and that is the weight of a foot rather than a shoulder.
+            vec2 push = vec2(trample.r - trample.g, trample.b - trample.a);
+            float pushLength = length(push);
+
+            trampleDirection = push / max(pushLength, 0.0001);
+            trampleBend = pushLength * windowFade;
+            trampleCrush = min(min(trample.r, trample.g), min(trample.b, trample.a)) * windowFade;
+         }
+      }
+
       // Wind is two scrolling taps of a tiling noise texture: fine sway riding on slow gust
       // fronts that roll coherently across the meadow, in place of eight sin() calls per
       // vertex. The scroll rates matter more than the amplitudes - the field only reads as
@@ -291,7 +320,10 @@ const vertexShader = `
 
       vec2 leanDirection = vec2(cos(leanAngle), sin(leanAngle));
       float leanStrength = radians(mix(3.0, 15.0, clump));
-      float windStrength = radians(29.0) * (sway * 1.6 + gust * 0.9 + flutter) * uWindScale;
+      // A blade that is already pressed flat has nothing left for the wind to move, which is
+      // what stops a fresh trail from shimmering in the breeze like the field around it.
+      float windStrength = radians(29.0) * (sway * 1.6 + gust * 0.9 + flutter) * uWindScale *
+         (1.0 - 0.8 * max(trampleCrush, trampleBend * 0.6));
       vec2 windDirection = uWindDirection + vec2(-uWindDirection.y, uWindDirection.x) * sway * 0.8;
 
       // Natural droop and wind used to be two separate axis rotations. Folding them into one
@@ -303,80 +335,29 @@ const vertexShader = `
       float bendAngle = length(bendVector);
       vec2 bendDirection = bendVector / max(bendAngle, 0.0001);
 
-      float displacementAmount = 0.0;
-      vec2 displacementDirection = vec2(0.0);
-      vec2 localForward = normalize(uLocalMotion.xy + vec2(0.001, -0.002));
-      vec2 localRight = vec2(-localForward.y, localForward.x);
-      float localSpeedFade = smoothstep(0.25, 7.0, uLocalMotion.z);
-
-      // Only blades inside the bounding circle of the active players can be trampled, so the
-      // displacer work is skipped outright for the overwhelming majority of the field.
-      if (uInteractionScale > 0.01 && distance(worldXZ, uDisplacerBounds.xy) < uDisplacerBounds.z) {
-         vec2 fromLocal = worldXZ - uDisplacers[0].xy;
-         float localRadius = uDisplacers[0].z;
-         float localInfluence = 1.0 - smoothstep(localRadius * 0.08, localRadius, length(fromLocal));
-         float forwardDistance = dot(fromLocal, localForward);
-         float sideDistance = dot(fromLocal, localRight);
-         vec2 leftFoot = vec2(forwardDistance * 1.25, (sideDistance - 0.82) * 0.72);
-         vec2 rightFoot = vec2(forwardDistance * 1.25, (sideDistance + 0.82) * 0.72);
-         float leftFootInfluence = 1.0 - smoothstep(0.65, 2.45, length(leftFoot));
-         float rightFootInfluence = 1.0 - smoothstep(0.65, 2.45, length(rightFoot));
-         float footprintInfluence = max(leftFootInfluence, rightFootInfluence);
-         float bodyLengthFade = 1.0 - smoothstep(1.25, localRadius * 0.82, abs(forwardDistance));
-         float bodyWidthFade = 1.0 - smoothstep(0.35, 3.15, abs(sideDistance));
-         float sidePartingInfluence =
-            bodyLengthFade * bodyWidthFade * mix(0.38, 1.0, localSpeedFade) * ${glsl.partingStrength};
-         float softBodyInfluence = smoothstep(0.08, 0.96, localInfluence) * mix(0.18, 0.3, localSpeedFade);
-         float footPressure = footprintInfluence * mix(0.9, 0.42, localSpeedFade) * ${glsl.footprintStrength};
-         float sideSign = mix(-1.0, 1.0, step(0.0, sideDistance));
-
-         displacementAmount = max(max(softBodyInfluence, footPressure), sidePartingInfluence);
-         displacementDirection = normalize(
-            localForward * (softBodyInfluence * 0.85 + footPressure * 0.22) +
-            localRight * sideSign * sidePartingInfluence * 1.55 +
-            localRight * ((leftFootInfluence - rightFootInfluence) * footPressure * 1.4) +
-            normalize(fromLocal + vec2(0.001, -0.002)) * softBodyInfluence * 0.22 +
-            vec2(0.001, -0.002)
-         ) * displacementAmount;
-
-         // The local player owns the detailed footfall and parting model above; remote players
-         // only need a soft radial push, which keeps the loop body branch free.
-         for (int i = 1; i < ${MAX_GRASS_DISPLACERS}; i++) {
-            if (i >= uDisplacerCount) {
-               break;
-            }
-
-            vec2 fromPlayer = worldXZ - uDisplacers[i].xy;
-            float radius = uDisplacers[i].z;
-            float influence = 1.0 - smoothstep(radius * 0.08, radius, length(fromPlayer));
-            float leanInfluence = smoothstep(0.05, 0.96, influence) * 0.64;
-
-            displacementDirection += normalize(fromPlayer + vec2(0.001, -0.002)) * leanInfluence;
-            displacementAmount = max(displacementAmount, leanInfluence);
-         }
-
-         if (uLocalMotion.z > 0.01) {
-            vec2 motionDirection = normalize(uLocalMotion.xy);
-            vec2 fromLocalPlayer = worldXZ - uPlayerPosition;
-            float behindPlayer = dot(fromLocalPlayer, -motionDirection);
-            float trailSide = abs(dot(fromLocalPlayer, vec2(-motionDirection.y, motionDirection.x)));
-            float trailFade = smoothstep(-1.5, 1.0, behindPlayer) *
-               (1.0 - smoothstep(${glsl.wakeInner}, ${glsl.wakeOuter}, behindPlayer)) *
-               (1.0 - smoothstep(${glsl.wakeInnerWidth}, ${glsl.wakeOuterWidth}, trailSide));
-            float wakeInfluence = trailFade * smoothstep(0.35, 8.0, uLocalMotion.z);
-
-            displacementDirection += motionDirection * wakeInfluence * ${glsl.wakeStrength};
-            displacementAmount = max(displacementAmount, wakeInfluence * 0.72);
-         }
-
-         displacementAmount *= uInteractionScale;
-      }
-
       // Rotating each vertex by an angle that grows along the blade bends it into an arc
       // rather than tipping it rigidly, which is what gives multi-segment blades a real
       // curved silhouette. A single-segment blade collapses to the old rigid behaviour.
       float curveT = t * (0.45 + 0.55 * t);
-      float displacementTip = t * t;
+      float displacementAmount = max(trampleBend, trampleCrush);
+
+      // Wind curls a blade over from the tip down, so it gets a square profile that leaves the
+      // base upright. Trample is the opposite shape, and how far the other way it goes depends
+      // on how hard the blade is being held down.
+      //
+      // A light push just leans the stem over: concave, so the angle is spent low on the blade
+      // and the thing hinges near the ground instead of flopping its top over. Real pressure
+      // goes further and changes the silhouette rather than just deepening it - the angle peaks
+      // past vertical around mid-blade, laying that stretch flat along the floor and pointing
+      // away from whoever is standing there, and then eases back off so the tip lifts again
+      // past the edge of the contact. That hook is the shape grass actually takes around
+      // something standing in it, and it is what the single peaked profile below draws.
+      //
+      // Only the tip value matters to a single-segment blade, so the far ring and the mobile
+      // LOD tip rigidly either way and see none of this.
+      float leanProfile = t * (2.0 - t);
+      float pressedProfile = t * (3.36 - 2.81 * t);
+      float displacementTip = mix(leanProfile, pressedProfile, smoothstep(0.45, 0.95, displacementAmount));
 
       vec3 basePosition = vec3(worldXZ.x, worldY, worldXZ.y);
       vec3 relativePosition = vec3(aBladeYaw.x, 0.0, aBladeYaw.y) * side * width;
@@ -387,16 +368,34 @@ const vertexShader = `
       relativePosition = bend * relativePosition;
       bladeNormal = bend * bladeNormal;
 
-      if (displacementAmount > 0.001) {
-         displacementDirection = normalize(displacementDirection + vec2(0.0001, -0.0002));
+      if (displacementAmount > 0.004) {
+         // Being shouldered aside and being stood on are different motions, so they are summed
+         // as vectors and applied as one rotation. Crush uses the blade's own facing rather
+         // than a shared direction: a print where every blade goes down the way it happened to
+         // be pointing reads as matted, where one where they all fall the same way reads as a
+         // brush stroke.
+         vec2 crushDirection = vec2(aBladeYaw.x, aBladeYaw.y);
+         vec2 flattenVector = trampleDirection * trampleBend * radians(${glsl.bendAngle}) +
+            crushDirection * trampleCrush * radians(${glsl.crushAngle});
+         // The nudge keeps the axis defined when bend and crush cancel each other out exactly,
+         // which would otherwise normalize a zero vector and put NaNs through the whole matrix.
+         vec2 flattenDirection = normalize(flattenVector + vec2(0.0001, -0.0002));
+         // Bend and crush can also point the same way, and then their angles add, so the sum
+         // has to be capped: a blade taken much past horizontal folds its tip into the ground.
+         float flattenAngle = min(length(flattenVector), radians(${glsl.crushAngle}));
 
          mat3 flatten = rotateAroundAxis(
-            normalize(vec3(displacementDirection.y, 0.0, -displacementDirection.x)),
-            radians(-58.0) * displacementAmount * ${glsl.displacerStrength} * displacementTip
+            normalize(vec3(flattenDirection.y, 0.0, -flattenDirection.x)),
+            -flattenAngle * displacementTip
          );
 
          relativePosition = flatten * relativePosition;
-         relativePosition.y *= mix(1.0, 0.88, displacementAmount * displacementTip);
+         // What is left standing after a foot has been through it is shorter as well as bent,
+         // and that loss of height is most of what separates a footprint from a windblown patch.
+         // Being shouldered aside costs a blade some reach too, which is what finally clears the
+         // ones rooted under a character - their bases cannot move, so the height has to give.
+         relativePosition.y *= mix(1.0, ${glsl.bendSquash}, trampleBend * displacementTip) *
+            mix(1.0, ${glsl.crushSquash}, trampleCrush * displacementTip);
          bladeNormal = flatten * bladeNormal;
       }
 
@@ -420,7 +419,8 @@ const vertexShader = `
       color *= mix(0.70, 1.20, wrapDiffuse);
       color += aBladeColor * vec3(0.62, 0.86, 0.34) * backlight * 0.9 * t;
       color += vec3(0.17, 0.19, 0.11) * sheen * t;
-      color *= mix(1.0, 0.62, displacementAmount * displacementTip);
+      // Flattened grass sits in its own shadow, and a crushed patch more so than a brushed one.
+      color *= mix(1.0, 0.6, (trampleBend * 0.65 + trampleCrush) * displacementTip);
       color *= mix(0.55, 1.0, visibility);
 
       vColor = color;
@@ -434,19 +434,30 @@ const vertexShader = `
       // and the field visibly stops sooner because of it.
       vFog = smoothstep(${glsl.fogNear}, ${glsl.fogFar}, distance(uCameraPosition, transformed));
 
+      vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
+      #include <shadowmap_vertex>
+
       gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
    }
 `
 
 const fragmentShader = `
    uniform vec3 uFogColor;
+   uniform bool receiveShadow;
 
    varying vec3 vColor;
    varying float vAlpha;
    varying float vFog;
    varying float vHash;
 
+   #include <common>
+   #include <shadowmap_pars_fragment>
+   #include <shadowmask_pars_fragment>
+
    void main() {
+      float shadowMask = getShadowMask();
+      vec3 shadowedColor = vColor * mix(0.68, 1.0, shadowMask);
+
       #ifdef OPAQUE_GRASS
          // A stable per-blade hash rather than a screen-space dither: blades in the fade band
          // drop out one at a time instead of dissolving, so nothing shimmers as the camera
@@ -455,13 +466,13 @@ const fragmentShader = `
             discard;
          }
 
-         gl_FragColor = vec4(mix(vColor, uFogColor, vFog), 1.0);
+         gl_FragColor = vec4(mix(shadowedColor, uFogColor, vFog), 1.0);
       #else
          if (vAlpha < 0.02) {
             discard;
          }
 
-         gl_FragColor = vec4(mix(vColor, uFogColor, vFog), vAlpha);
+         gl_FragColor = vec4(mix(shadowedColor, uFogColor, vFog), vAlpha);
       #endif
    }
 `
@@ -478,22 +489,6 @@ function createSeededRandom(seed: number) {
       value = (value * 1664525 + 1013904223) >>> 0
       return value / 4294967296
    }
-}
-
-function fbm(noise2D: TerrainNoise, x: number, z: number, octaves: number) {
-   let amplitude = 1
-   let frequency = 1
-   let total = 0
-   let normalisation = 0
-
-   for (let octave = 0; octave < octaves; octave++) {
-      total += noise2D(x * frequency, z * frequency) * amplitude
-      normalisation += amplitude
-      amplitude *= 0.5
-      frequency *= 2
-   }
-
-   return total / normalisation / 2 + 0.5
 }
 
 /**
@@ -844,10 +839,11 @@ const GrassLayer: React.FC<GrassLayerProps> = ({
    )
 
    // The shared uniform objects are spread in by reference, so the parent's single useFrame
-   // drives time, camera, frustum and displacers for every layer at once. Only the per-layer
+   // drives time, camera, frustum and the trample map for every layer at once. Only the
    // constants below are unique to this material, and none of them change after mount.
    const uniforms = useMemo(
       () => ({
+         ...UniformsUtils.clone(UniformsLib.lights),
          ...sharedUniforms,
          uPatchSize: { value: patchSize },
          uPatchHalfSize: { value: patchHalfSize },
@@ -878,7 +874,7 @@ const GrassLayer: React.FC<GrassLayerProps> = ({
    const defines = useMemo(() => (opaque ? { OPAQUE_GRASS: '' } : {}), [opaque])
 
    return (
-      <mesh frustumCulled={false} renderOrder={renderOrder}>
+      <mesh frustumCulled={false} receiveShadow renderOrder={renderOrder}>
          <primitive object={grass} attach="geometry" />
          <shaderMaterial
             ref={materialRef}
@@ -889,6 +885,7 @@ const GrassLayer: React.FC<GrassLayerProps> = ({
             side={DoubleSide}
             transparent={!opaque}
             depthWrite={opaque}
+            lights
          />
       </mesh>
    )
@@ -906,23 +903,16 @@ const Grass: React.FC = () => {
    )
    const windMap = useMemo(() => (shouldCreateGrass ? createWindTexture() : null), [shouldCreateGrass])
 
-   const displacers = useMemo(
-      () => Array.from({ length: MAX_GRASS_DISPLACERS }, () => new Vector3(0, 0, GRASS_DISPLACER_RADIUS)),
-      []
+   const trampleField = useMemo(
+      () => (shouldCreateGrass ? createTrampleField(quality.trampleMapSize) : null),
+      [quality.trampleMapSize, shouldCreateGrass]
    )
+
    const frustumPlanes = useMemo(() => Array.from({ length: 6 }, () => new Vector4()), [])
    const frustum = useMemo(() => new Frustum(), [])
    const frustumMatrix = useMemo(() => new Matrix4(), [])
    const playerPosition = useMemo(() => new Vector2(0, 0), [])
    const cameraPosition = useMemo(() => new Vector3(0, 0, 0), [])
-   const localMotion = useMemo(() => new Vector3(0, 0, 0), [])
-   const displacerBounds = useMemo(() => new Vector3(0, 0, 0), [])
-
-   const lastLocalPosition = useRef(new Vector2(0, 0))
-   const lastLocalDirection = useRef(new Vector2(0.72, 0.42).normalize())
-   const currentLocalVelocity = useRef(new Vector2(0, 0))
-   const smoothedLocalVelocity = useRef(new Vector2(0, 0))
-   const hasLastLocalPosition = useRef(false)
 
    const layerHandles = useRef(new Set<GrassLayerHandle>())
    const densityScale = useRef(1)
@@ -945,7 +935,7 @@ const Grass: React.FC = () => {
    // Vector, array and texture uniforms are shared by reference and mutated in place, so one
    // write here reaches every layer. Scalars are the exception - see GrassLayerHandle.
    const sharedUniforms = useMemo(() => {
-      if (!fieldMap || !windMap) {
+      if (!fieldMap || !windMap || !trampleField) {
          return null
       }
 
@@ -961,17 +951,17 @@ const Grass: React.FC = () => {
          uSunDirection: { value: SUN_DIRECTION },
          uFrustumPlanes: { value: frustumPlanes },
          uWindDirection: { value: new Vector2(0.72, 0.42).normalize() },
-         uFogColor: { value: new Vector3(0, 0, 0) },
+         uFogColor: { value: GRASS_FOG_COLOR },
          // Half the terrain relief plus the tallest a blade can stand and sway, so the cull
          // sphere never rejects a blade that should still be on screen.
          uCullRadius: { value: (fieldMap.maxHeight - fieldMap.minHeight) / 2 + 12 },
          uDensityScale: { value: densityScale.current },
-         uDisplacerCount: { value: 1 },
-         uDisplacers: { value: displacers },
-         uDisplacerBounds: { value: displacerBounds },
-         uLocalMotion: { value: localMotion },
+         // The trample map ping-pongs between two targets, so unlike every other texture here
+         // its value changes every frame and has to be rewritten per material in the loop.
+         uTrampleMap: { value: trampleField.texture() },
+         uTrampleWindow: { value: trampleField.window },
       }
-   }, [cameraPosition, displacerBounds, displacers, fieldMap, frustumPlanes, localMotion, playerPosition, windMap])
+   }, [cameraPosition, fieldMap, frustumPlanes, playerPosition, trampleField, windMap])
 
    useEffect(() => {
       const cleanups = Array.from({ length: totalLayers }, (_, index) =>
@@ -987,12 +977,13 @@ const Grass: React.FC = () => {
       () => () => {
          fieldMap?.texture.dispose()
          windMap?.dispose()
+         trampleField?.dispose()
       },
-      [fieldMap, windMap]
+      [fieldMap, trampleField, windMap]
    )
 
    useFrame((state, delta) => {
-      if (!sharedUniforms) {
+      if (!sharedUniforms || !trampleField) {
          return
       }
 
@@ -1013,71 +1004,22 @@ const Grass: React.FC = () => {
          frustumPlanes[plane].set(normal.x, normal.y, normal.z, constant)
       }
 
-      if (!hasLastLocalPosition.current) {
-         lastLocalPosition.current.set(localX, localZ)
-         hasLastLocalPosition.current = true
-         localMotion.set(lastLocalDirection.current.x, lastLocalDirection.current.y, 0)
-      } else {
-         const safeDelta = Math.max(delta, 1 / 120)
-
-         currentLocalVelocity.current.set(
-            (localX - lastLocalPosition.current.x) / safeDelta,
-            (localZ - lastLocalPosition.current.y) / safeDelta
-         )
-
-         const currentSpeed = currentLocalVelocity.current.length()
-         const smoothedSpeed = smoothedLocalVelocity.current.length()
-         const velocityLerp = currentSpeed > smoothedSpeed ? delta * 12 : delta * 3.5
-
-         smoothedLocalVelocity.current.lerp(currentLocalVelocity.current, Math.min(1, velocityLerp))
-
-         const speed = smoothedLocalVelocity.current.length()
-
-         if (speed > 0.05) {
-            lastLocalDirection.current.set(
-               smoothedLocalVelocity.current.x / speed,
-               smoothedLocalVelocity.current.y / speed
-            )
-            localMotion.set(lastLocalDirection.current.x, lastLocalDirection.current.y, speed)
-         } else {
-            localMotion.set(lastLocalDirection.current.x, lastLocalDirection.current.y, 0)
-         }
-
-         lastLocalPosition.current.set(localX, localZ)
-      }
-
-      displacers[0].set(localX, localZ, GRASS_DISPLACER_RADIUS)
-
-      let count = 1
-      let boundsRadius = GRASS_DISPLACER_RADIUS + GRASS_WAKE_RADIUS
-
-      for (const player of usePlayerPositionsStore.getState().playerPositions.values()) {
-         if (count >= quality.maxDisplacers) {
-            break
-         }
-
-         const offsetX = player.targetPosition.x - localX
-         const offsetZ = player.targetPosition.z - localZ
-         const distance = Math.hypot(offsetX, offsetZ)
-
-         // A player past the near patch cannot bend any blade that is still being drawn.
-         if (distance > NEAR_FADE_END + GRASS_DISPLACER_RADIUS) {
-            continue
-         }
-
-         displacers[count].set(player.targetPosition.x, player.targetPosition.z, GRASS_DISPLACER_RADIUS)
-         boundsRadius = Math.max(boundsRadius, distance + GRASS_DISPLACER_RADIUS)
-         count++
-      }
-
-      displacerBounds.set(localX, localZ, boundsRadius)
+      // One decay pass and one instanced stamp, for everyone in the meadow at once. This runs
+      // before the scene render for the frame, so the map the blades read below is current.
+      const trampleMap = trampleField.update(
+         state.gl,
+         delta,
+         localX,
+         localZ,
+         usePlayerPositionsStore.getState().playerPositions
+      )
 
       // Vector and array uniforms above are mutated in place, so every material sees them
-      // through the shared value object. Scalars cannot work that way (see GrassLayerHandle),
-      // so they are written to each material directly.
+      // through the shared value object. Scalars and the ping-ponged trample texture cannot
+      // work that way (see GrassLayerHandle), so they are written to each material directly.
       layerHandles.current.forEach((layer) => {
          layer.material.uniforms.uTime.value = elapsed
-         layer.material.uniforms.uDisplacerCount.value = count
+         layer.material.uniforms.uTrampleMap.value = trampleMap
       })
 
       if (visibleLayerCount < totalLayers) {

@@ -35,7 +35,11 @@ export interface PlayerPositionsStore {
 }
 
 function playerMetadataChanged(current: RemotePlayerPosition, next: PlayerSnapshotData) {
-   return current.action !== next.action || current.userName !== next.userName || current.microphone !== next.microphone
+   return (
+      (next.action !== undefined && current.action !== next.action) ||
+      (next.userName !== undefined && current.userName !== next.userName) ||
+      (next.microphone !== undefined && current.microphone !== next.microphone)
+   )
 }
 
 function updateTargetTransform(player: RemotePlayerPosition, next: PlayerSnapshotData) {
@@ -77,9 +81,17 @@ function updateRemotePlayer(
    const shouldPublish = playerMetadataChanged(player, data)
 
    updateTargetTransform(player, data)
-   player.action = data.action
-   player.userName = data.userName
-   player.microphone = data.microphone
+   if (data.action !== undefined) {
+      player.action = data.action
+   }
+
+   if (data.userName !== undefined) {
+      player.userName = data.userName
+   }
+
+   if (data.microphone !== undefined) {
+      player.microphone = data.microphone
+   }
    player.seq = seq
    player.serverTime = serverTime
 

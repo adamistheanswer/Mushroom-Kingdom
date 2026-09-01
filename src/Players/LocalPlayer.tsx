@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useMemo } from 'react'
+import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Vector3, Euler, Group } from 'three'
@@ -36,12 +36,20 @@ interface LocalPlayerWrapperProps {
    showSpawnEffect?: boolean
 }
 
+function roundTo(value: number, places: number): number {
+   const scale = 10 ** places
+   return Math.round(value * scale) / scale
+}
+
 const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, showSpawnEffect = true }) => {
    const localClientId = useUserStore((state) => state.localClientId)
+   const userName = useUserStore((state) => state.userName)
    const localVoiceState = useClientAudioStore((state) =>
       localClientId ? (state.clients[localClientId] ?? DEFAULT_LOCAL_VOICE_STATE) : DEFAULT_LOCAL_VOICE_STATE
    )
    const selectedMenuAction = usePlayerActionStore((state) => state.selectedMenuAction)
+   const [localAction, setLocalAction] = useState('3')
+   const localActionRef = useRef(localAction)
    const arraysEqualMemo = useMemo(() => arraysEqual, [])
    const playerPositions = useRef(usePlayerPositionsStore.getState().playerPositions)
 
@@ -55,6 +63,7 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
    const velocity = 25
 
    const tempVector = useMemo(() => new Vector3(), [])
+   const nextPosition = useMemo(() => new Vector3(), [])
    const cameraOffset = useMemo(() => new Vector3(), [])
    const tempEuler = useMemo(() => new Euler(), [])
    const upVector = useMemo(() => new Vector3(0, 1, 0), [])
@@ -93,6 +102,15 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
       }
    }, [sendClientUpdate])
 
+   const publishLocalAction = useCallback((action: string) => {
+      if (localActionRef.current === action) {
+         return
+      }
+
+      localActionRef.current = action
+      setLocalAction(action)
+   }, [])
+
    const updatePlayer = useCallback(
       (state, delta) => {
          const group = groupRef.current
@@ -103,30 +121,30 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
 
          if (group && state.controls && state.camera) {
             const azimuthAngle = state.controls.getAzimuthalAngle()
-            let actionsArray: string[] = []
+            const actionsArray: string[] = []
             if ((!isTyping && forward) || forwardJoy !== 0) {
                tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
-               const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
-               if (isWithinWorldBounds(newPosition) && !isColliding(newPosition, playerPositions.current, tempVector, 5)) {
-                  group.position.copy(newPosition)
+               nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
+               if (isWithinWorldBounds(nextPosition) && !isColliding(nextPosition, playerPositions.current, tempVector, 5)) {
+                  group.position.copy(nextPosition)
                }
                actionsArray.push('Walking')
             }
 
             if ((!isTyping && backward) || backwardJoy !== 0) {
                tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
-               const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
-               if (isWithinWorldBounds(newPosition) && !isColliding(newPosition, playerPositions.current, tempVector, 5)) {
-                  group.position.copy(newPosition)
+               nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
+               if (isWithinWorldBounds(nextPosition) && !isColliding(nextPosition, playerPositions.current, tempVector, 5)) {
+                  group.position.copy(nextPosition)
                }
                actionsArray.push('WalkingB')
             }
 
             if ((!isTyping && left) || leftJoy !== 0) {
                tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-               const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
-               if (isWithinWorldBounds(newPosition) && !isColliding(newPosition, playerPositions.current, tempVector, 5)) {
-                  group.position.copy(newPosition)
+               nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
+               if (isWithinWorldBounds(nextPosition) && !isColliding(nextPosition, playerPositions.current, tempVector, 5)) {
+                  group.position.copy(nextPosition)
                }
                if ((!isTyping && backward) || backwardJoy !== 0) {
                   actionsArray.push('StrafeRight')
@@ -137,9 +155,9 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
 
             if ((!isTyping && right) || rightJoy !== 0) {
                tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-               const newPosition = group.position.clone().addScaledVector(tempVector, velocity * delta)
-               if (isWithinWorldBounds(newPosition) && !isColliding(newPosition, playerPositions.current, tempVector, 5)) {
-                  group.position.copy(newPosition)
+               nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
+               if (isWithinWorldBounds(nextPosition) && !isColliding(nextPosition, playerPositions.current, tempVector, 5)) {
+                  group.position.copy(nextPosition)
                }
                if ((!isTyping && backward) || backwardJoy !== 0) {
                   actionsArray.push('StrafeLeft')
@@ -165,11 +183,9 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
                actionsArray.push('Idle')
             }
 
-            const currentRotation = [0, Number(azimuthAngle.toFixed(4)), 0]
+            const currentRotation = [0, roundTo(azimuthAngle, 4), 0]
 
-            const currentPosition = groupRef.current?.position
-               .toArray()
-               .map((value) => Number((value as number).toFixed(2)))
+            const currentPosition = [roundTo(group.position.x, 2), roundTo(group.position.y, 2), roundTo(group.position.z, 2)]
 
             const currentAction = isTyping
                ? '3'
@@ -178,6 +194,8 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
                  : actionsArray.length
                    ? playerActionsToIndexes(actionsArray).join()
                    : '3'
+
+            publishLocalAction(currentAction)
 
             const currentState = {
                rotation: currentRotation,
@@ -195,7 +213,7 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
             }
          }
       },
-      [groupRef, orbitRef, camRef, velocity, clientSocket, selectedMenuAction, sendClientUpdate]
+      [nextPosition, publishLocalAction, selectedMenuAction, sendClientUpdate]
    )
 
    useFrame((state, delta) => {
@@ -210,15 +228,14 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
             position={LOCAL_CHILD_POSITION}
             clientId={localClientId}
             isLocal={true}
-            socket={clientSocket}
+            userName={userName}
             microphone={localVoiceState?.microphone}
             speaking={localVoiceState?.speaking}
          />
          <Avatar
             position={LOCAL_CHILD_POSITION}
             rotation={LOCAL_CHILD_ROTATION}
-            clientId={localClientId}
-            clientSocket={clientSocket}
+            action={localAction}
          />
          <OrbitControls
             ref={orbitRef}
