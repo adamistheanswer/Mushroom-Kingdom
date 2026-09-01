@@ -73,7 +73,7 @@ export const Avatar = React.memo<AvatarProps>(
          avatarRef.current.rotation.y = avatarRef.current.rotation.y + Math.PI
       }, [rotation])
 
-      const { animations, nodes } = useSkinnedMeshClone('../Models/Player/FullMushy.gltf')
+      const { animations, nodes } = useSkinnedMeshClone('../Models/Player/FullMushy.glb')
       // @ts-ignore
       const { actions } = useAnimations<GLTFActions>(animations, avatarRef)
 
@@ -119,4 +119,4 @@ export const Avatar = React.memo<AvatarProps>(
    }
 )
 
-useGLTF.preload('../Models/Player/FullMushy.gltf')
+useGLTF.preload('../Models/Player/FullMushy.glb')

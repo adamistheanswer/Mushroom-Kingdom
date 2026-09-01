@@ -15,13 +15,14 @@ import { decode, encode } from '@msgpack/msgpack'
 import { PlayerAudioConnection } from './Components/PlayerAudioConnection'
 import OverlayUIWrapper from './Components/OverlayUIWrapper'
 import useSceneryStore from './State/SceneryStore'
-import { PCFSoftShadowMap } from 'three'
+import { PCFShadowMap } from 'three'
 import { PlayerPositionUpdate, PlayerSnapshotData, usePlayerPositionsStore } from './State/playerPositionsStore'
 import useClientAudioStore from './State/clientsAudioStore'
 import { MobileJoystick } from './Utils/useJoystickControls'
 import { useChatStore } from './State/chatStore'
 import { FOG_FAR, FOG_NEAR, SCENE_BACKGROUND_COLOR, SCENE_FOG_COLOR } from './Environment/sceneQuality'
 import { ChatBubbleTicker } from './Players/NamePlate'
+import { useVisualViewport } from './Utils/useVisualViewport'
 import DebugOverlay, {
    createNetworkDebugStats,
    createSceneDebugStats,
@@ -73,6 +74,8 @@ const App: React.FC = () => {
    const addChatMessage = useChatStore((state) => state.addMessage)
    const markChatClientDisconnected = useChatStore((state) => state.markClientDisconnected)
    const clearChatMessages = useChatStore((state) => state.clearMessages)
+
+   useVisualViewport()
 
    const handleSceneReady = useCallback(() => {
       setSceneReady(true)
@@ -285,9 +288,9 @@ const App: React.FC = () => {
    ])
 
    return (
-      <div style={{ width: '100%', height: '100vh' }}>
-         <Canvas dpr={[1, 1.5]} gl={canvasGlOptions} shadows={{ type: PCFSoftShadowMap }}>
-             {/* <Stats />  */}
+      <div className="mk-app">
+         <Canvas dpr={[1, 1.5]} gl={canvasGlOptions} shadows={{ type: PCFShadowMap }}>
+            {/* <Stats />  */}
             {DEBUG_TOOLS_ENABLED && <SceneDebugSampler sceneStatsRef={sceneDebugStatsRef} />}
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
             <color attach="background" args={[SCENE_BACKGROUND_COLOR]} />
@@ -305,8 +308,13 @@ const App: React.FC = () => {
             </Suspense>
          </Canvas>
 
-         {socket && <OverlayUIWrapper socket={socket} />}
-         {socket && <MobileJoystick />}
+         {/* Every on-screen control sits in the HUD layer so it tracks the visual
+             viewport together and stays reachable while the keyboard is up. */}
+         <div className="mk-hud">
+            {socket && <OverlayUIWrapper socket={socket} />}
+            {socket && <MobileJoystick />}
+         </div>
+
          {socket && <PlayerAudioConnection socket={socket} />}
          {socket && <ChatBubbleTicker />}
          {DEBUG_TOOLS_ENABLED && (

@@ -2,7 +2,6 @@ import React, { FormEvent, useEffect, useRef, useState } from 'react'
 import { encode } from '@msgpack/msgpack'
 import { useChatStore } from '../State/chatStore'
 import { useIsMobile } from '../Utils/useIsMobile'
-import { useKeyboardInset } from '../Utils/useKeyboardInset'
 
 interface ChatPanelProps {
    socket: WebSocket
@@ -23,11 +22,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ socket }) => {
    const [unreadCount, setUnreadCount] = useState(0)
    const messages = useChatStore((state) => state.messages)
    const messagesRef = useRef<HTMLDivElement>(null)
-   const formRef = useRef<HTMLFormElement>(null)
+   const inputRef = useRef<HTMLInputElement>(null)
    const lastSeenIdRef = useRef<string | null>(null)
    const isMobile = useIsMobile()
-
-   useKeyboardInset(formRef)
 
    // On desktop the log is always on screen, on mobile it lives behind the bottom left toggle.
    const logVisible = !isMobile || logOpen
@@ -59,6 +56,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ socket }) => {
          })
       )
       setMessageText('')
+      // Submitting inside a user gesture, so refocusing keeps the keyboard up on iOS.
+      inputRef.current?.focus()
    }
 
    return (
@@ -109,8 +108,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ socket }) => {
                <span className="chat-panel__badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
             )}
          </button>
-         <form ref={formRef} className="chat-panel__form" onSubmit={sendMessage}>
+         <form className="chat-panel__form" onSubmit={sendMessage}>
             <input
+               ref={inputRef}
                className="chat-panel__input"
                type="text"
                value={messageText}
@@ -121,7 +121,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ socket }) => {
                autoComplete="off"
                enterKeyHint="send"
             />
-            <button className="chat-panel__send" type="submit" disabled={!messageText.trim()}>
+            <button
+               className="chat-panel__send"
+               type="submit"
+               disabled={!messageText.trim()}
+               // Pressing the button would otherwise blur the input, which tears the
+               // keyboard down and back up between every message.
+               onMouseDown={(event) => event.preventDefault()}
+            >
                Send
             </button>
          </form>

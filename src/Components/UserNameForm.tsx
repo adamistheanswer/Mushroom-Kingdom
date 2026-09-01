@@ -44,6 +44,8 @@ const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
       right: isMobile ? '84px' : 'auto',
       transform: isMobile ? 'none' : 'translateX(-50%)',
       zIndex: 100,
+      // The HUD layer it sits in does not take pointer events itself.
+      pointerEvents: 'auto',
    }
 
    const inputStyle = {

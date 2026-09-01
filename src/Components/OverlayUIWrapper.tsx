@@ -1,4 +1,4 @@
-import { useProgress } from '@react-three/drei'
+import { useLoadingProgress } from '../Utils/useLoadingProgress'
 import React from 'react'
 import UserNameForm from './UserNameForm'
 import PopoutMenu from './PopoutMenu'
@@ -9,7 +9,7 @@ interface UserNameFormProps {
 }
 
 const OverlayUIWrapper: React.FC<UserNameFormProps> = ({ socket }) => {
-   const { loaded } = useProgress()
+   const { loaded } = useLoadingProgress()
 
    return (
       <>
