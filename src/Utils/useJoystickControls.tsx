@@ -72,6 +72,20 @@ export function MobileJoystick() {
       resetJoystickControls()
    }, [])
 
+   useEffect(() => {
+      // The joystick is hidden while the on-screen keyboard is up, so let go of any held
+      // direction instead of leaving the player jogging off while they type.
+      const handleFocusIn = (event: FocusEvent) => {
+         if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+            resetJoystick()
+         }
+      }
+
+      window.addEventListener('focusin', handleFocusIn)
+
+      return () => window.removeEventListener('focusin', handleFocusIn)
+   }, [resetJoystick])
+
    const updateJoystickFromPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
       const rect = baseRef.current?.getBoundingClientRect()
       if (!rect) {

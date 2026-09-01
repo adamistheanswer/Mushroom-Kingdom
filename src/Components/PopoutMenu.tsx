@@ -61,6 +61,8 @@ const PopoutMenu: React.FC<PopoutMenuProps> = ({ socket }) => {
       left: 'max(20px, env(safe-area-inset-left))',
       top: 'max(20px, env(safe-area-inset-top))',
       zIndex: 30,
+      // The HUD layer it sits in does not take pointer events itself.
+      pointerEvents: 'auto',
    }
 
    const mainButtonStyle = {

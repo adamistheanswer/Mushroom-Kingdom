@@ -1,31 +1,66 @@
 :root {
-   /* Mobile HUD stack, measured up from the bottom of the screen:
+   /* Mobile HUD stack, measured up from the bottom of the visible area:
       composer bar, then the joystick + chat toggle, then the message log. */
    --mk-safe-bottom: max(12px, env(safe-area-inset-bottom));
    --mk-composer-height: 44px;
    --mk-hud-bottom: calc(var(--mk-safe-bottom) + var(--mk-composer-height) + 8px);
    --mk-joystick-height: 140px;
-   /* Set from the visual viewport so the composer rides above the keyboard. */
-   --mk-keyboard-inset: 0px;
-   --mk-viewport-height: 100vh;
-   /* Bottom of the stack that rides on top of the composer while the keyboard is open. */
-   --mk-typing-bottom: calc(var(--mk-safe-bottom) + var(--mk-keyboard-inset) + var(--mk-composer-height) + 8px);
+   --mk-log-bottom: calc(var(--mk-hud-bottom) + var(--mk-joystick-height) + 10px);
+   /* Visual viewport rect, published by useVisualViewport. */
+   --mk-vv-width: 100vw;
+   --mk-vv-height: 100vh;
+   --mk-vv-left: 0px;
+   --mk-vv-top: 0px;
+}
+
+/* The keyboard covers the home indicator and hides the joystick, so the bottom stack
+   tightens up and the message log drops down onto the toggle. */
+html[data-mk-keyboard] {
+   --mk-safe-bottom: 8px;
+   --mk-log-bottom: calc(var(--mk-hud-bottom) + 58px);
 }
 
 /* The scene renders on a black background, so anything the browser paints around the
    canvas (rubber band overscroll, the strip behind a collapsing Safari toolbar, the gap
    while the keyboard animates) matches it instead of flashing white. */
 html {
+   height: 100%;
    background-color: #000;
    color-scheme: dark;
+   overflow: hidden;
+   overscroll-behavior: none;
 }
 
 body {
+   height: 100%;
    margin: 0;
    background-color: #000;
    overflow: hidden;
-   -webkit-overflow-scrolling: touch;
    overscroll-behavior: none;
+}
+
+#root {
+   height: 100%;
+}
+
+.mk-app {
+   width: 100%;
+   height: 100%;
+}
+
+/* Everything the player touches lives in here. A transform makes this element the
+   containing block for its `position: fixed` children, so sizing it to the visual
+   viewport is all it takes for the whole HUD to ride above the on-screen keyboard
+   instead of disappearing behind it. */
+.mk-hud {
+   position: fixed;
+   top: 0;
+   left: 0;
+   width: var(--mk-vv-width);
+   height: var(--mk-vv-height);
+   transform: translate(var(--mk-vv-left), var(--mk-vv-top));
+   z-index: 1;
+   pointer-events: none;
 }
 
 #joystickWrapper1 {
@@ -87,7 +122,12 @@ body {
    z-index: 20;
    width: min(360px, calc(100vw - 28px));
    color: white;
-   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+   font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
    pointer-events: auto;
 }
 
@@ -228,14 +268,10 @@ body {
 
    /* Message bar spans the very bottom, under both the joystick and the toggle. */
    .chat-panel__form {
-      position: fixed;
+      position: absolute;
       right: max(14px, env(safe-area-inset-right));
-      bottom: 0;
+      bottom: var(--mk-safe-bottom);
       left: max(14px, env(safe-area-inset-left));
-      /* Transform rather than bottom: iOS repaints a composited layer reliably and
-         keeps the bar in step with the keyboard instead of settling a beat late. */
-      transform: translateY(calc(-1 * (var(--mk-safe-bottom) + var(--mk-keyboard-inset))));
-      will-change: transform;
       gap: 6px;
       margin-top: 0;
       pointer-events: auto;
@@ -284,7 +320,7 @@ body {
    /* Opens above the joystick so it never swallows movement taps. */
    .chat-panel__log {
       position: absolute;
-      bottom: calc(var(--mk-hud-bottom) + var(--mk-joystick-height) + 10px);
+      bottom: var(--mk-log-bottom);
       left: max(14px, env(safe-area-inset-left));
       right: max(14px, env(safe-area-inset-right));
       padding: 8px;
@@ -294,7 +330,10 @@ body {
       box-sizing: border-box;
       opacity: 0;
       transform: translateY(8px);
-      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+      transition:
+         opacity 0.2s ease,
+         transform 0.2s ease,
+         visibility 0.2s;
       visibility: hidden;
       pointer-events: none;
    }
@@ -306,14 +345,10 @@ body {
       pointer-events: auto;
    }
 
-   /* The keyboard swallows the joystick row, so the toggle and the log stack straight
-      on top of the composer while typing instead of sitting behind it. */
-   html[data-mk-typing] .chat-panel__toggle {
-      bottom: var(--mk-typing-bottom);
-   }
-
-   html[data-mk-typing] .chat-panel__log {
-      bottom: calc(var(--mk-typing-bottom) + 58px);
+   /* Typing is a mode of its own: the joystick would eat most of what is left above the
+      keyboard, so it stands down until the composer is dismissed. */
+   html[data-mk-keyboard] #joystickWrapper1 {
+      display: none;
    }
 
    .chat-panel__log-header {
@@ -345,7 +380,7 @@ body {
 
    .chat-panel__messages {
       /* Tracks the visible height so the log stays clear of the keyboard. */
-      max-height: min(calc(var(--mk-viewport-height) * 0.34), 210px);
+      max-height: min(calc(var(--mk-vv-height) * 0.34), 210px);
       padding: 0;
       border: none;
       border-radius: 0;

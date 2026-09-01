@@ -6,11 +6,24 @@ import fs from 'fs'
 import viteConfig from './vite.config.js'
 import { createServer } from 'vite'
 import express from 'express'
+import compression from 'compression'
 import http from 'http'
 
 const router = express.Router()
 const app = express()
 let vite
+
+// mime-db carries no `compressible` flag for FBX, so the default filter would skip the Forest
+// models. They are largely float arrays and shed roughly a third of their bytes, so opt them in.
+function shouldCompress(req, res) {
+   if (res.getHeader('Content-Type') === 'application/vnd.autodesk.fbx') {
+      return true
+   }
+
+   return compression.filter(req, res)
+}
+
+app.use(compression({ filter: shouldCompress }))
 
 if (process.env.NODE_ENV === 'development') {
    vite = await createServer({
