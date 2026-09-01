@@ -245,7 +245,7 @@ const App: React.FC = () => {
    return (
       <div style={{ width: '100%', height: '100vh' }}>
          <Canvas dpr={[1, 1.5]} gl={canvasGlOptions} shadows={{ type: PCFSoftShadowMap }}>
-            {/* <Stats /> */}
+             {/* <Stats />  */}
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
             <color attach="background" args={['#01030a']} />
             <fog attach="fog" color="#040a16" near={FOG_NEAR} far={FOG_FAR} />

@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react'
-import { Vector3 } from 'three'
+import React, { useLayoutEffect, useMemo, useRef } from 'react'
+import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three'
 import { useFBX } from '@react-three/drei'
 import useSceneryStore from '../State/SceneryStore'
 
@@ -34,49 +34,71 @@ const modelUrlMap = {
    27: '../Models/Forest/Plant_3.fbx',
 }
 
-const useFBXHandler = (url, scale) => {
-   const model = useFBX(url)
-   const clonedModel = useMemo(() => {
-      const m = model.clone()
-      m.scale.setScalar(scale)
-      m.traverse((mesh) => {
-         // Every prop casts, foliage included. The per-model scales below normalise source files
-         // that are authored at wildly different units, so a small scale factor says nothing
-         // about how big a prop ends up in world: the ferns and grass tufts are large enough for
-         // their shadows to read on the ground, and they are half of what makes the floor busy.
-         mesh.castShadow = true
-         mesh.receiveShadow = true
+const Y_AXIS = new Vector3(0, 1, 0)
+
+
+const SceneryInstances = ({ geometry, material, localMatrix, entities }) => {
+   const meshRef = useRef<InstancedMesh>(null!)
+
+   const args = useMemo(() => [geometry, material, entities.length], [geometry, material, entities.length])
+
+   useLayoutEffect(() => {
+      const mesh = meshRef.current
+      if (!mesh) return
+
+      const matrix = new Matrix4()
+      const position = new Vector3()
+      const rotation = new Quaternion()
+      const scale = new Vector3()
+
+      entities.forEach((entity, index) => {
+         position.set(entity[1], 0, entity[2])
+         rotation.setFromAxisAngle(Y_AXIS, entity[4])
+         scale.setScalar(entity[3])
+
+         mesh.setMatrixAt(index, matrix.compose(position, rotation, scale).multiply(localMatrix))
       })
-      return m
-   }, [model, scale])
-   return clonedModel
+
+      mesh.instanceMatrix.needsUpdate = true
+
+      mesh.computeBoundingSphere()
+   }, [entities, localMatrix])
+
+   return <instancedMesh ref={meshRef} args={args} castShadow receiveShadow />
 }
 
-const isFoliage = (url) => url.includes('Plant') || url.includes('Flowers') || url.includes('Grass')
-
-const getModelScale = (url) => (isFoliage(url) ? 0.1 : url.includes('Log') ? 0.2 : 0.5)
-
 const SceneryModelGroup = ({ modelUrl, entities }) => {
-   const model = useFBXHandler(modelUrl, getModelScale(modelUrl))
-   const objects = useMemo(
-      () =>
-         entities.map((entity) => ({
-            entity,
-            object: model.clone(),
-            position: new Vector3(entity[1], 0, entity[2]),
-         })),
-      [entities, model]
-   )
+   const model = useFBX(modelUrl)
+
+
+   const parts = useMemo(() => {
+      model.updateMatrixWorld(true)
+
+      const rootInverse = new Matrix4().copy(model.matrixWorld).invert()
+      const found = []
+
+      model.traverse((child) => {
+         if (!child.isMesh) return
+
+         found.push({
+            geometry: child.geometry,
+            material: child.material,
+            localMatrix: new Matrix4().multiplyMatrices(rootInverse, child.matrixWorld),
+         })
+      })
+
+      return found
+   }, [model])
 
    return (
       <>
-         {objects.map(({ entity, object, position }) => (
-            <primitive
-               key={entity.toString()}
-               rotation={[0, entity[4], 0]}
-               scale={entity[3]}
-               position={position}
-               object={object}
+         {parts.map((part, index) => (
+            <SceneryInstances
+               key={index}
+               geometry={part.geometry}
+               material={part.material}
+               localMatrix={part.localMatrix}
+               entities={entities}
             />
          ))}
       </>

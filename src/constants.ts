@@ -9,4 +9,4 @@ export const PLAYER_WORLD_LIMIT = WORLD_HALF_SIZE - PLAYER_WORLD_BOUNDARY_PADDIN
 
 // Direction the moonlight arrives from. Shared so the moon in the sky and the light that
 // casts the shadows can never drift out of agreement.
-export const MOONLIGHT_OFFSET: [number, number, number] = [-240, 300, 0]
+export const MOONLIGHT_OFFSET: [number, number, number] = [240, 300, 0]

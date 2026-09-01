@@ -102,8 +102,8 @@ export default function Lighting() {
          />
          <directionalLight
             ref={sunRef}
-            args={[MOONLIGHT_COLOR, 0.3 * legacyLightingMultiplier]}
-            position={[-240, 300, 0]}
+            args={[MOONLIGHT_COLOR, 0.4 * legacyLightingMultiplier]}
+            position={MOONLIGHT_OFFSET}
             shadow-mapSize-width={SHADOW_MAP_SIZE}
             shadow-mapSize-height={SHADOW_MAP_SIZE}
             castShadow
