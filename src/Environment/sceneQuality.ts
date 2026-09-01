@@ -10,6 +10,8 @@ import { isHandheldDevice } from '../Utils/isHandheldDevice'
 export const IS_HANDHELD = isHandheldDevice()
 
 export const FOG_NEAR = 50
+export const SCENE_BACKGROUND_COLOR = '#01030a'
+export const SCENE_FOG_COLOR = '#050c16'
 
 /**
  * Fog distance is the highest leverage mobile dial in the scene: it sets how wide the shadow

@@ -21,6 +21,8 @@ const SHADOW_FOG_MARGIN = 10
 // Mood dials. Cool, desaturated key light and a dim blue fill read as moonlight; push them back
 // towards white to undo the night-time grade.
 const MOONLIGHT_COLOR = 0xc2d4f7
+const SKY_FILL_COLOR = 0xb7c7ed
+const GROUND_BOUNCE_COLOR = 0x687985
 const NIGHT_FILL_COLOR = 0x6d82b5
 
 // Shadow camera basis, matching how three builds it from lookAt with a world up of +Y.
@@ -95,9 +97,7 @@ export default function Lighting() {
    return (
       <>
          <hemisphereLight
-            args={[0xffffff, 0xfffffff, 0.2 * legacyLightingMultiplier]}
-            color={[0, 0, 0]}
-            groundColor={[0, 2, 1]}
+            args={[SKY_FILL_COLOR, GROUND_BOUNCE_COLOR, 0.4 * legacyLightingMultiplier]}
             position={[0, 600, 0]}
          />
          <directionalLight

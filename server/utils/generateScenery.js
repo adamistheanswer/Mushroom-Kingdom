@@ -2,7 +2,7 @@ function randomBetween(min, max) {
    return Math.random() * (max - min) + min
 }
 
-const SPAWN_CLEAR_RADIUS = 30
+const SPAWN_CLEAR_RADIUS = 60
 
 function randomSignedCoordinate(max) {
    return Math.ceil(Math.random() * max) * (Math.round(Math.random()) ? 1 : -1)
@@ -25,7 +25,7 @@ function randomPositionOutsideSpawnClearArea(max) {
 }
 
 export function generateLargeScenery() {
-   return Array.from({ length: 80 }, () => {
+   return Array.from({ length: 50 }, () => {
       const [x, z] = randomPositionOutsideSpawnClearArea(475)
 
       return [

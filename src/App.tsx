@@ -20,7 +20,7 @@ import { PlayerPositionUpdate, PlayerSnapshotData, usePlayerPositionsStore } fro
 import useClientAudioStore from './State/clientsAudioStore'
 import { MobileJoystick } from './Utils/useJoystickControls'
 import { useChatStore } from './State/chatStore'
-import { FOG_FAR, FOG_NEAR } from './Environment/sceneQuality'
+import { FOG_FAR, FOG_NEAR, SCENE_BACKGROUND_COLOR, SCENE_FOG_COLOR } from './Environment/sceneQuality'
 import { ChatBubbleTicker } from './Players/NamePlate'
 import DebugOverlay, {
    createNetworkDebugStats,
@@ -290,8 +290,8 @@ const App: React.FC = () => {
              {/* <Stats />  */}
             {DEBUG_TOOLS_ENABLED && <SceneDebugSampler sceneStatsRef={sceneDebugStatsRef} />}
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
-            <color attach="background" args={['#01030a']} />
-            <fog attach="fog" color="#040a16" near={FOG_NEAR} far={FOG_FAR} />
+            <color attach="background" args={[SCENE_BACKGROUND_COLOR]} />
+            <fog attach="fog" color={SCENE_FOG_COLOR} near={FOG_NEAR} far={FOG_FAR} />
             <Lighting />
             <Sky />
             <Suspense fallback={<Loader />}>

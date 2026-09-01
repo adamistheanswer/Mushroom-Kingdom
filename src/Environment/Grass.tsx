@@ -15,13 +15,15 @@ import {
    ShaderMaterial,
    Sphere,
    UnsignedByteType,
+   UniformsLib,
+   UniformsUtils,
    Vector2,
    Vector3,
    Vector4,
 } from 'three'
 import { MOONLIGHT_OFFSET, WORLD_HALF_SIZE } from '../constants'
 import { isHandheldDevice } from '../Utils/isHandheldDevice'
-import { FOG_FAR, FOG_NEAR } from './sceneQuality'
+import { FOG_FAR, FOG_NEAR, SCENE_FOG_COLOR } from './sceneQuality'
 import { usePlayerPositionsStore } from '../State/playerPositionsStore'
 import { createTerrainNoise, fbm, getTerrainHeightAtWorld } from './terrain'
 import { createTrampleField } from './TrampleField'
@@ -66,6 +68,18 @@ const WIND_SWAY_BLADE_JITTER = 0.003
 
 // Matches the directional light in Environment/Lighting.
 const SUN_DIRECTION = new Vector3(...MOONLIGHT_OFFSET).normalize()
+const GRASS_FOG_COLOR = hexColorToShaderVector(SCENE_FOG_COLOR)
+
+function hexColorToShaderVector(hexColor: string) {
+   const hex = hexColor.replace('#', '')
+   const value = Number.parseInt(hex, 16)
+
+   return new Vector3(
+      ((value >> 16) & 255) / 255,
+      ((value >> 8) & 255) / 255,
+      (value & 255) / 255
+   )
+}
 
 interface QualityProfile {
    nearBlades: number
@@ -173,6 +187,9 @@ const vertexShader = `
    varying float vAlpha;
    varying float vFog;
    varying float vHash;
+
+   #include <common>
+   #include <shadowmap_pars_vertex>
 
    mat3 rotateAroundAxis(vec3 axis, float angle) {
       float s = sin(angle);
@@ -417,19 +434,30 @@ const vertexShader = `
       // and the field visibly stops sooner because of it.
       vFog = smoothstep(${glsl.fogNear}, ${glsl.fogFar}, distance(uCameraPosition, transformed));
 
+      vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
+      #include <shadowmap_vertex>
+
       gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
    }
 `
 
 const fragmentShader = `
    uniform vec3 uFogColor;
+   uniform bool receiveShadow;
 
    varying vec3 vColor;
    varying float vAlpha;
    varying float vFog;
    varying float vHash;
 
+   #include <common>
+   #include <shadowmap_pars_fragment>
+   #include <shadowmask_pars_fragment>
+
    void main() {
+      float shadowMask = getShadowMask();
+      vec3 shadowedColor = vColor * mix(0.68, 1.0, shadowMask);
+
       #ifdef OPAQUE_GRASS
          // A stable per-blade hash rather than a screen-space dither: blades in the fade band
          // drop out one at a time instead of dissolving, so nothing shimmers as the camera
@@ -438,13 +466,13 @@ const fragmentShader = `
             discard;
          }
 
-         gl_FragColor = vec4(mix(vColor, uFogColor, vFog), 1.0);
+         gl_FragColor = vec4(mix(shadowedColor, uFogColor, vFog), 1.0);
       #else
          if (vAlpha < 0.02) {
             discard;
          }
 
-         gl_FragColor = vec4(mix(vColor, uFogColor, vFog), vAlpha);
+         gl_FragColor = vec4(mix(shadowedColor, uFogColor, vFog), vAlpha);
       #endif
    }
 `
@@ -815,6 +843,7 @@ const GrassLayer: React.FC<GrassLayerProps> = ({
    // constants below are unique to this material, and none of them change after mount.
    const uniforms = useMemo(
       () => ({
+         ...UniformsUtils.clone(UniformsLib.lights),
          ...sharedUniforms,
          uPatchSize: { value: patchSize },
          uPatchHalfSize: { value: patchHalfSize },
@@ -845,7 +874,7 @@ const GrassLayer: React.FC<GrassLayerProps> = ({
    const defines = useMemo(() => (opaque ? { OPAQUE_GRASS: '' } : {}), [opaque])
 
    return (
-      <mesh frustumCulled={false} renderOrder={renderOrder}>
+      <mesh frustumCulled={false} receiveShadow renderOrder={renderOrder}>
          <primitive object={grass} attach="geometry" />
          <shaderMaterial
             ref={materialRef}
@@ -856,6 +885,7 @@ const GrassLayer: React.FC<GrassLayerProps> = ({
             side={DoubleSide}
             transparent={!opaque}
             depthWrite={opaque}
+            lights
          />
       </mesh>
    )
@@ -921,7 +951,7 @@ const Grass: React.FC = () => {
          uSunDirection: { value: SUN_DIRECTION },
          uFrustumPlanes: { value: frustumPlanes },
          uWindDirection: { value: new Vector2(0.72, 0.42).normalize() },
-         uFogColor: { value: new Vector3(0.016, 0.039, 0.086) },
+         uFogColor: { value: GRASS_FOG_COLOR },
          // Half the terrain relief plus the tallest a blade can stand and sway, so the cull
          // sphere never rejects a blade that should still be on screen.
          uCullRadius: { value: (fieldMap.maxHeight - fieldMap.minHeight) / 2 + 12 },
