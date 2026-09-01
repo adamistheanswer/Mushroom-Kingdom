@@ -6,6 +6,7 @@ import Ground from './Environment/Ground'
 import Grass from './Environment/Grass'
 import Forest from './Environment/Forest'
 import BoundaryWalls from './Environment/BoundaryWalls'
+import Sky from './Environment/Sky'
 import Loader from './Components/Loader'
 import RemotePlayers from './Players/RemotePlayers'
 import LocalPlayer from './Players/LocalPlayer'
@@ -14,11 +15,12 @@ import { decode, encode } from '@msgpack/msgpack'
 import { PlayerAudioConnection } from './Components/PlayerAudioConnection'
 import OverlayUIWrapper from './Components/OverlayUIWrapper'
 import useSceneryStore from './State/SceneryStore'
-import { PCFShadowMap } from 'three'
+import { PCFSoftShadowMap } from 'three'
 import { PlayerPositionUpdate, PlayerSnapshotData, usePlayerPositionsStore } from './State/playerPositionsStore'
 import useClientAudioStore from './State/clientsAudioStore'
 import { MobileJoystick } from './Utils/useJoystickControls'
 import { useChatStore } from './State/chatStore'
+import { FOG_FAR, FOG_NEAR } from './Environment/sceneQuality'
 
 const canvasGlOptions = { powerPreference: 'high-performance' } as const
 
@@ -242,12 +244,13 @@ const App: React.FC = () => {
 
    return (
       <div style={{ width: '100%', height: '100vh' }}>
-         <Canvas dpr={[1, 1.5]} gl={canvasGlOptions} shadows={{ type: PCFShadowMap }}>
+         <Canvas dpr={[1, 1.5]} gl={canvasGlOptions} shadows={{ type: PCFSoftShadowMap }}>
             {/* <Stats /> */}
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
-            <color attach="background" args={['black']} />
-            <fog attach="fog" color="black" near={50} far={300} />
+            <color attach="background" args={['#01030a']} />
+            <fog attach="fog" color="#040a16" near={FOG_NEAR} far={FOG_FAR} />
             <Lighting />
+            <Sky />
             <Suspense fallback={<Loader />}>
                <SceneReadySignal onReady={handleSceneReady} />
                {socket && <RemotePlayers clientSocket={socket} />}

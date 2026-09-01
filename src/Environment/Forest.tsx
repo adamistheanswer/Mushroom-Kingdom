@@ -40,6 +40,10 @@ const useFBXHandler = (url, scale) => {
       const m = model.clone()
       m.scale.setScalar(scale)
       m.traverse((mesh) => {
+         // Every prop casts, foliage included. The per-model scales below normalise source files
+         // that are authored at wildly different units, so a small scale factor says nothing
+         // about how big a prop ends up in world: the ferns and grass tufts are large enough for
+         // their shadows to read on the ground, and they are half of what makes the floor busy.
          mesh.castShadow = true
          mesh.receiveShadow = true
       })
@@ -48,8 +52,9 @@ const useFBXHandler = (url, scale) => {
    return clonedModel
 }
 
-const getModelScale = (url) =>
-   url.includes('Plant') || url.includes('Flowers') || url.includes('Grass') ? 0.1 : url.includes('Log') ? 0.2 : 0.5
+const isFoliage = (url) => url.includes('Plant') || url.includes('Flowers') || url.includes('Grass')
+
+const getModelScale = (url) => (isFoliage(url) ? 0.1 : url.includes('Log') ? 0.2 : 0.5)
 
 const SceneryModelGroup = ({ modelUrl, entities }) => {
    const model = useFBXHandler(modelUrl, getModelScale(modelUrl))
