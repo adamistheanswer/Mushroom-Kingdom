@@ -36,8 +36,9 @@ function normaliseMovementPosition(position, fallbackPosition) {
    return [clamp(x, -PLAYER_WORLD_LIMIT, PLAYER_WORLD_LIMIT), y, clamp(z, -PLAYER_WORLD_LIMIT, PLAYER_WORLD_LIMIT)]
 }
 
-export function handleStateSetVoiceChatStatus(message) {
-   const { voiceChatEnabled, clientId } = message.payload
+// The id comes from the connection, never the payload, so nobody can flip another player's mic.
+export function handleStateSetVoiceChatStatus(clientId, message) {
+   const voiceChatEnabled = message.payload?.voiceChatEnabled === true
    const clientData = getClient(clientId)
    if (!clientData) return
 

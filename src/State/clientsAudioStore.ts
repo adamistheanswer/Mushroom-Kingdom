@@ -84,16 +84,16 @@ export const useClientAudioStore = create<ClientsStore>((set, get) => ({
    updateClientSpeakingStatus: (clientId, speaking) => {
       set((state) => {
          const currentClient = state.clients[clientId]
-         if (currentClient?.speaking === speaking) {
+
+         // Tearing an audio graph down emits a final `speaking: false`, which arrives after the
+         // client has already been removed. Recreating them here would resurrect a departed
+         // player with the microphone on, and the roster would keep dialling a ghost.
+         if (!currentClient || currentClient.speaking === speaking) {
             return state
          }
 
          const updatedClients = { ...state.clients }
-         updatedClients[clientId] = {
-            ...updatedClients[clientId],
-            microphone: updatedClients[clientId]?.microphone ?? true,
-            speaking,
-         }
+         updatedClients[clientId] = { ...currentClient, speaking }
          return { clients: updatedClients }
       })
    },

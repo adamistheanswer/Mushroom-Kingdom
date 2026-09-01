@@ -23,10 +23,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ socket }) => {
    const [unreadCount, setUnreadCount] = useState(0)
    const messages = useChatStore((state) => state.messages)
    const messagesRef = useRef<HTMLDivElement>(null)
+   const formRef = useRef<HTMLFormElement>(null)
    const lastSeenIdRef = useRef<string | null>(null)
    const isMobile = useIsMobile()
 
-   useKeyboardInset()
+   useKeyboardInset(formRef)
 
    // On desktop the log is always on screen, on mobile it lives behind the bottom left toggle.
    const logVisible = !isMobile || logOpen
@@ -108,7 +109,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ socket }) => {
                <span className="chat-panel__badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
             )}
          </button>
-         <form className="chat-panel__form" onSubmit={sendMessage}>
+         <form ref={formRef} className="chat-panel__form" onSubmit={sendMessage}>
             <input
                className="chat-panel__input"
                type="text"

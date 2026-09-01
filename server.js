@@ -26,6 +26,39 @@ if (process.env.NODE_ENV === 'development') {
    app.use(express.static('dist'))
 }
 
+const DEFAULT_STUN_URLS = ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']
+
+function parseUrlList(value, fallback = []) {
+   if (!value) {
+      return fallback
+   }
+
+   return value
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean)
+}
+
+/**
+ * WebRTC only reaches peers behind symmetric NAT through a TURN relay. Serving the list here
+ * keeps credentials out of the client bundle and lets them rotate without a rebuild.
+ */
+router.get('/ice-servers', (req, res) => {
+   const iceServers = [{ urls: parseUrlList(process.env.STUN_URLS, DEFAULT_STUN_URLS) }]
+   const turnUrls = parseUrlList(process.env.TURN_URLS)
+
+   if (turnUrls.length > 0) {
+      iceServers.push({
+         urls: turnUrls,
+         username: process.env.TURN_USERNAME,
+         credential: process.env.TURN_CREDENTIAL,
+      })
+   }
+
+   res.set('Cache-Control', 'no-store')
+   res.json({ iceServers })
+})
+
 router.get('/', async (req, res, next) => {
    try {
       let html = fs.readFileSync('index.html', 'utf-8')
@@ -45,7 +78,12 @@ router.use((req, res) => {
 app.use(router)
 
 const httpServer = http.createServer(app)
-export const wsServer = new WebSocketServer({ server: httpServer })
+
+// `ws` accepts 100MB frames by default, which lets one client exhaust the process heap. Nothing
+// a client legitimately sends comes close - the largest is a WebRTC offer at a few kilobytes.
+const MAX_WS_PAYLOAD = 64 * 1024
+
+export const wsServer = new WebSocketServer({ server: httpServer, maxPayload: MAX_WS_PAYLOAD })
 
 function markSocketAlive() {
    this.isAlive = true
