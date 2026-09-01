@@ -5,27 +5,11 @@ import { clone as SkeletonUtilsClone } from 'three/examples/jsm/utils/SkeletonUt
 import { useGraph } from '@react-three/fiber'
 import { actionsArr } from '../Utils/playerActionsToIndexes'
 import { Bone, SkinnedMesh, MeshStandardMaterial, Vector3, Euler, AnimationAction, Group } from 'three'
-import { decode } from '@msgpack/msgpack'
 
 interface AvatarProps {
    position: Vector3
    rotation: Euler
-   clientSocket: any
-   clientId: any
    action?: string
-}
-
-interface WebSocketMessage {
-   type: string
-   payload: any
-}
-
-function getClientUpdate(payload, clientId) {
-   if (Array.isArray(payload)) {
-      return payload.find((client) => client.id === clientId)
-   }
-
-   return payload?.[clientId]
 }
 
 type GLTFResult = GLTF & {
@@ -69,7 +53,7 @@ function useSkinnedMeshClone(path) {
 }
 
 export const Avatar = React.memo<AvatarProps>(
-   ({ position = new Vector3(0, 0, 0), rotation = new Euler(0, 0, 0), clientSocket, clientId, action }) => {
+   ({ position = new Vector3(0, 0, 0), rotation = new Euler(0, 0, 0), action }) => {
       const [currentAction, setCurrentAction] = useState(action ?? '3')
 
       useEffect(() => {
@@ -77,30 +61,6 @@ export const Avatar = React.memo<AvatarProps>(
             setCurrentAction(action)
          }
       }, [action])
-
-      useEffect(() => {
-         if (action !== undefined) {
-            return
-         }
-
-         const handleAnimations = (event) => {
-            const message = decode(event.data) as WebSocketMessage
-            if (message.type === 'clientUpdates') {
-               const updatedClient = getClientUpdate(message.payload, clientId)
-               updatedClient?.action && setCurrentAction(updatedClient.action)
-            }
-         }
-
-         if (clientSocket) {
-            clientSocket.addEventListener('message', handleAnimations)
-         }
-
-         return () => {
-            if (clientSocket) {
-               clientSocket.removeEventListener('message', handleAnimations)
-            }
-         }
-      }, [action, clientId, clientSocket])
 
       const avatarRef = useRef<Group>(null!)
 

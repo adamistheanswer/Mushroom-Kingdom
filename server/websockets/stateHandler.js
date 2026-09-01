@@ -47,7 +47,7 @@ export function handleStateSetVoiceChatStatus(message) {
 
    clientData.microphone = voiceChatEnabled
    setClient(clientId, clientData)
-   markClientUpdated(clientId)
+   markClientUpdated(clientId, 'microphone')
    broadcastClientVoiceChatStatusUpdate(clientId, voiceChatEnabled)
 }
 
@@ -63,7 +63,7 @@ export function handleStateSetUserName(clientId, message) {
 
    clientData.userName = nextUserName
    setClient(clientId, clientData)
-   markClientUpdated(clientId)
+   markClientUpdated(clientId, 'userName')
 }
 
 export function handleStateSetPlayerAction(clientId, message) {
@@ -73,7 +73,7 @@ export function handleStateSetPlayerAction(clientId, message) {
 
    clientData.action = action
    setClient(clientId, clientData)
-   markClientUpdated(clientId)
+   markClientUpdated(clientId, 'action')
 }
 
 export function handleStateSetPlayerMovement(clientId, message) {
@@ -96,7 +96,7 @@ export function handleStateSetPlayerMovement(clientId, message) {
    clientData.rotation = nextRotation
    clientData.action = action
    setClient(clientId, clientData)
-   markClientUpdated(clientId)
+   markClientUpdated(clientId, ['position', 'rotation', 'action'])
 }
 
 export function handleChatMessage(clientId, message) {

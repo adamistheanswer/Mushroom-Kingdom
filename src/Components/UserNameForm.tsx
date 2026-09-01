@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { encode } from '@msgpack/msgpack'
 import { useIsMobile } from '../Utils/useIsMobile'
+import useUserStore from '../State/userStore'
 
 interface WebSocketMessage {
    type: string
@@ -13,14 +14,18 @@ interface UserNameFormProps {
 
 const UserNameForm: React.FC<UserNameFormProps> = ({ socket }) => {
    const [userName, setUserName] = useState('')
+   const setStoredUserName = useUserStore((state) => state.setUserName)
    const isMobile = useIsMobile('(max-width: 480px)')
 
    const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      setUserName(event.target.value)
+      const nextUserName = event.target.value
+
+      setUserName(nextUserName)
+      setStoredUserName(nextUserName)
 
       const message: WebSocketMessage = {
          type: 'state_set_username',
-         payload: event.target.value,
+         payload: nextUserName,
       }
 
       if (socket.readyState === WebSocket.OPEN) {

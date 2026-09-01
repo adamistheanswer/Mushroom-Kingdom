@@ -41,17 +41,30 @@ export const useClientAudioStore = create<ClientsStore>((set, get) => ({
    updateClientsFromDeltas: (clientDeltas) => {
       set((state) => {
          const updatedClients = { ...state.clients }
+         let changed = false
 
          for (const client of clientDeltas) {
             if (!client.id || client.microphone === undefined) {
                continue
             }
 
-            updatedClients[client.id] = {
-               ...updatedClients[client.id],
-               microphone: client.microphone,
-               speaking: client.microphone ? updatedClients[client.id]?.speaking : false,
+            const currentClient = updatedClients[client.id]
+            const nextSpeaking = client.microphone ? currentClient?.speaking : false
+
+            if (currentClient?.microphone === client.microphone && currentClient?.speaking === nextSpeaking) {
+               continue
             }
+
+            updatedClients[client.id] = {
+               ...currentClient,
+               microphone: client.microphone,
+               speaking: nextSpeaking,
+            }
+            changed = true
+         }
+
+         if (!changed) {
+            return state
          }
 
          return { clients: updatedClients }

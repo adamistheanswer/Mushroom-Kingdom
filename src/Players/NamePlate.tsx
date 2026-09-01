@@ -2,99 +2,157 @@ import React, { useRef, useEffect, useMemo, useState } from 'react'
 import { Text } from '@react-three/drei'
 import { Group, Mesh, Vector3 } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
-import { decode } from '@msgpack/msgpack'
-import { CHAT_BUBBLE_DURATION_MS, CHAT_BUBBLE_FADE_MS, useChatStore } from '../State/chatStore'
+import { CHAT_BUBBLE_DURATION_MS, CHAT_BUBBLE_FADE_MS, ChatMessage, useChatStore } from '../State/chatStore'
+import {
+   recordChatBubbleRender,
+   recordChatBubbleTickerUpdate,
+   recordNameplateVisibility,
+   registerChatBubble,
+   registerNameplate,
+} from '../Utils/nameplateDebugMetrics'
 
 interface NamePlateProps {
    position: Vector3
    isLocal: boolean
    clientId: any
-   socket: WebSocket
    userName?: string
    microphone?: boolean
    speaking?: boolean
 }
 
-interface WebSocketMessage {
-   type: string
-   payload: any
-}
+const NAMEPLATE_HEIGHT = 13
+const NAMEPLATE_MAX_DISTANCE = 180
+const NAMEPLATE_SCREEN_MARGIN = 1.18
+const CHAT_BUBBLE_TICK_MS = 250
 
-function getClientUpdate(payload, clientId) {
-   if (Array.isArray(payload)) {
-      return payload.find((client) => client.id === clientId)
+export const ChatBubbleTicker = React.memo(() => {
+   const messageCount = useChatStore((state) => state.messages.length)
+   const visibleMessageCount = useChatStore((state) => Object.keys(state.visibleChatMessagesByClientId).length)
+   const setChatBubbleNow = useChatStore((state) => state.setChatBubbleNow)
+
+   useEffect(() => {
+      if (messageCount === 0 || visibleMessageCount === 0) {
+         return
+      }
+
+      recordChatBubbleTickerUpdate()
+      setChatBubbleNow(Date.now())
+
+      const interval = window.setInterval(() => {
+         recordChatBubbleTickerUpdate()
+         setChatBubbleNow(Date.now())
+      }, CHAT_BUBBLE_TICK_MS)
+
+      return () => window.clearInterval(interval)
+   }, [messageCount, setChatBubbleNow, visibleMessageCount])
+
+   return null
+})
+
+const ChatBubble = React.memo(({ message }: { message: ChatMessage }) => {
+   const now = useChatStore((state) => state.chatBubbleNow)
+
+   useEffect(() => {
+      return registerChatBubble(message.id)
+   }, [message.id])
+
+   useEffect(() => {
+      recordChatBubbleRender()
+   })
+
+   const bubbleAge = now - message.createdAt
+   const bubbleFadeProgress = Math.max(0, bubbleAge - (CHAT_BUBBLE_DURATION_MS - CHAT_BUBBLE_FADE_MS)) / CHAT_BUBBLE_FADE_MS
+   const bubbleOpacity = Math.max(0, 1 - bubbleFadeProgress)
+   const bubbleWidth = Math.min(16, Math.max(6, message.text.length * 0.38))
+   const bubbleHeight = Math.max(2.2, Math.ceil(message.text.length / 24) * 1.08 + 1)
+
+   if (bubbleAge > CHAT_BUBBLE_DURATION_MS || bubbleOpacity <= 0) {
+      return null
    }
 
-   return payload?.[clientId]
-}
+   return (
+      <group position={[0, 2.5 + bubbleHeight / 2, 0]}>
+         <mesh position={[0, 0, -0.04]}>
+            <planeGeometry args={[bubbleWidth, bubbleHeight]} />
+            <meshBasicMaterial color="#10291d" transparent opacity={bubbleOpacity * 0.88} depthWrite={false} />
+         </mesh>
+         <Text
+            fontSize={0.95}
+            color="white"
+            fillOpacity={bubbleOpacity}
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={bubbleWidth - 1}
+            textAlign="center"
+         >
+            {message.text}
+         </Text>
+      </group>
+   )
+})
 
 export const NamePlate = React.memo<NamePlateProps>(
-   ({ position = new Vector3(0, 0, 0), isLocal, clientId, socket, userName, microphone, speaking }) => {
+   ({ position = new Vector3(0, 0, 0), isLocal, clientId, userName, microphone, speaking }) => {
       const nameplateRef = useRef<Group>(null!)
       const micIconRef = useRef<Group>(null!)
       const micLevelRefs = useRef<Mesh[]>([])
-      const nameplateHeight = 13
-      const [socketUserName, setSocketUserName] = useState('')
-      const [now, setNow] = useState(Date.now())
-      const messages = useChatStore((state) => state.messages)
-
+      const clientKey = String(clientId ?? '')
+      const debugId = `${isLocal ? 'local' : 'remote'}:${clientKey}`
       const { camera } = useThree()
-      const latestChatMessage = useMemo(() => {
-         const cutoff = now - CHAT_BUBBLE_DURATION_MS
-
-         for (let index = messages.length - 1; index >= 0; index--) {
-            const message = messages[index]
-            if (message.clientId === clientId && message.createdAt >= cutoff) {
-               return message
-            }
-         }
-
-         return null
-      }, [clientId, messages, now])
-      const bubbleAge = latestChatMessage ? now - latestChatMessage.createdAt : CHAT_BUBBLE_DURATION_MS
-      const bubbleFadeProgress = Math.max(0, bubbleAge - (CHAT_BUBBLE_DURATION_MS - CHAT_BUBBLE_FADE_MS)) / CHAT_BUBBLE_FADE_MS
-      const bubbleOpacity = latestChatMessage ? Math.max(0, 1 - bubbleFadeProgress) : 0
-      const bubbleWidth = latestChatMessage ? Math.min(16, Math.max(6, latestChatMessage.text.length * 0.38)) : 6
-      const bubbleHeight = latestChatMessage ? Math.max(2.2, Math.ceil(latestChatMessage.text.length / 24) * 1.08 + 1) : 2.2
+      const worldPosition = useMemo(() => new Vector3(), [])
+      const projectedPosition = useMemo(() => new Vector3(), [])
+      const latestChatMessage = useChatStore((state) => state.visibleChatMessagesByClientId[clientKey])
+      const [renderVisible, setRenderVisible] = useState(isLocal)
+      const renderVisibleRef = useRef(renderVisible)
 
       useEffect(() => {
-         const interval = window.setInterval(() => setNow(Date.now()), 250)
-         return () => window.clearInterval(interval)
-      }, [])
+         return registerNameplate(debugId)
+      }, [debugId])
 
-      useEffect(() => {
-         if (userName !== undefined) {
+      useFrame(() => {
+         const nameplate = nameplateRef.current
+         if (!nameplate) {
             return
          }
 
-         const handleNameplate = (event) => {
-            const message = decode(new Uint8Array(event.data)) as WebSocketMessage
-            if (message.type === 'clientUpdates') {
-               const updatedClient = getClientUpdate(message.payload, clientId)
-               updatedClient?.userName && setSocketUserName(updatedClient.userName)
+         nameplate.getWorldPosition(worldPosition)
+         let visibility: 'visible' | 'distance' | 'frustum' = 'visible'
+
+         if (!isLocal) {
+            if (camera.position.distanceTo(worldPosition) > NAMEPLATE_MAX_DISTANCE) {
+               visibility = 'distance'
+            } else {
+               projectedPosition.copy(worldPosition).project(camera)
+
+               if (
+                  projectedPosition.z < -1 ||
+                  projectedPosition.z > 1 ||
+                  Math.abs(projectedPosition.x) > NAMEPLATE_SCREEN_MARGIN ||
+                  Math.abs(projectedPosition.y) > NAMEPLATE_SCREEN_MARGIN
+               ) {
+                  visibility = 'frustum'
+               }
             }
          }
 
-         if (socket) {
-            socket.addEventListener('message', handleNameplate)
+         nameplate.visible = visibility === 'visible'
+         recordNameplateVisibility(debugId, visibility)
+
+         if (renderVisibleRef.current !== nameplate.visible) {
+            renderVisibleRef.current = nameplate.visible
+            setRenderVisible(nameplate.visible)
          }
 
-         return () => {
-            if (socket) {
-               socket.removeEventListener('message', handleNameplate)
-            }
+         if (!nameplate.visible) {
+            return
          }
-      }, [clientId, socket, userName])
 
-      useFrame(() => {
          if (isLocal) {
-            nameplateRef.current.rotation.x = 0
-            nameplateRef.current.rotation.y = 0
-            nameplateRef.current.rotation.z = 0
+            nameplate.rotation.x = 0
+            nameplate.rotation.y = 0
+            nameplate.rotation.z = 0
          } else {
-            nameplateRef.current.rotation.x = camera.rotation.x
-            nameplateRef.current.rotation.y = camera.rotation.y
-            nameplateRef.current.rotation.z = camera.rotation.z
+            nameplate.quaternion.copy(camera.quaternion)
          }
 
          if (micIconRef.current) {
@@ -116,32 +174,14 @@ export const NamePlate = React.memo<NamePlateProps>(
 
       useEffect(() => {
          nameplateRef.current.position.copy(position)
-         nameplateRef.current.position.y = nameplateRef.current.position.y + nameplateHeight
+         nameplateRef.current.position.y = nameplateRef.current.position.y + NAMEPLATE_HEIGHT
       }, [position])
 
       return (
          <group ref={nameplateRef}>
-            {latestChatMessage && (
-               <group position={[0, 2.5 + bubbleHeight / 2, 0]}>
-                  <mesh position={[0, 0, -0.04]}>
-                     <planeGeometry args={[bubbleWidth, bubbleHeight]} />
-                     <meshBasicMaterial color="#10291d" transparent opacity={bubbleOpacity * 0.88} depthWrite={false} />
-                  </mesh>
-                  <Text
-                     fontSize={0.95}
-                     color="white"
-                     fillOpacity={bubbleOpacity}
-                     anchorX="center"
-                     anchorY="middle"
-                     maxWidth={bubbleWidth - 1}
-                     textAlign="center"
-                  >
-                     {latestChatMessage.text}
-                  </Text>
-               </group>
-            )}
+            {renderVisible && latestChatMessage && <ChatBubble message={latestChatMessage} />}
             <Text fontSize={1} color={isLocal ? 'yellow' : 'white'} anchorX="center" anchorY="middle">
-               {userName || socketUserName || clientId}
+               {userName || clientId}
             </Text>
             {microphone && (
                <group ref={micIconRef} position={[4.45, 0, 0]}>

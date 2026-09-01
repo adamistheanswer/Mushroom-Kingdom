@@ -1,8 +1,8 @@
-import React, { useState, useEffect, CSSProperties } from 'react'
+import React, { useState, CSSProperties } from 'react'
 import useUserStore from '../State/userStore'
 import useClientAudioStore from '../State/clientsAudioStore'
 import { WebSocketMessage } from '../Interfaces/websockets'
-import { decode, encode } from '@msgpack/msgpack'
+import { encode } from '@msgpack/msgpack'
 import { useVoiceChat } from '../Utils/useVoiceChat'
 
 const containerStyle: CSSProperties = {
@@ -34,40 +34,8 @@ const pulseAnimation = {
 export function PlayerAudioConnection({ socket }) {
    const [voiceChatEnabled, setVoiceChatEnabled] = useState(false)
    const localClientId = useUserStore((state) => state.localClientId)
-   const removeClient = useClientAudioStore((state) => state.removeClient)
-   const setClients = useClientAudioStore((state) => state.setClients)
-   const updateClientsFromDeltas = useClientAudioStore((state) => state.updateClientsFromDeltas)
    const updateVoiceChatStatus = useClientAudioStore((state) => state.updateVoiceChatStatus)
    const { startVoiceChat, stopVoiceChat } = useVoiceChat(socket, localClientId)
-
-   useEffect(() => {
-      socket.addEventListener('message', handleMessage)
-      return () => {
-         socket.removeEventListener('message', handleMessage)
-      }
-   }, [removeClient, setClients, socket, updateClientsFromDeltas, updateVoiceChatStatus])
-
-   function handleMessage(event) {
-      const message = decode(event.data) as WebSocketMessage
-
-      switch (message.type) {
-         case 'activeClients':
-            setClients(message.payload)
-            break
-         case 'clientUpdates':
-            if (Array.isArray(message.payload)) {
-               updateClientsFromDeltas(message.payload)
-            }
-            break
-         case 'clientDisconnect':
-            removeClient(message.payload)
-            break
-         case 'voiceChatStatusUpdate':
-            const { clientId, voiceChatEnabled } = message.payload
-            updateVoiceChatStatus(clientId, voiceChatEnabled)
-            break
-      }
-   }
 
    async function toggleVoiceChat() {
       if (voiceChatEnabled) {

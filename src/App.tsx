@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, Suspense, useState } from 'react'
+import React, { useCallback, useEffect, Suspense, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerspectiveCamera, Stats } from '@react-three/drei'
 import Lighting from './Environment/Lighting'
@@ -21,8 +21,17 @@ import useClientAudioStore from './State/clientsAudioStore'
 import { MobileJoystick } from './Utils/useJoystickControls'
 import { useChatStore } from './State/chatStore'
 import { FOG_FAR, FOG_NEAR } from './Environment/sceneQuality'
+import { ChatBubbleTicker } from './Players/NamePlate'
+import DebugOverlay, {
+   createNetworkDebugStats,
+   createSceneDebugStats,
+   getSocketPayloadByteLength,
+   instrumentSocketSend,
+   SceneDebugSampler,
+} from './Components/DebugOverlay'
 
 const canvasGlOptions = { powerPreference: 'high-performance' } as const
+const DEBUG_TOOLS_ENABLED = import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug')
 
 function createSocket() {
    const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
@@ -49,6 +58,8 @@ const App: React.FC = () => {
    const [socket, setSocket] = useState<WebSocket | null>(null)
    const [sceneReady, setSceneReady] = useState(false)
    const [localSpawnEffectReady, setLocalSpawnEffectReady] = useState(false)
+   const networkDebugStatsRef = useRef(createNetworkDebugStats())
+   const sceneDebugStatsRef = useRef(createSceneDebugStats())
    const setClientId = useUserStore((state) => state.setClientId)
    const setLargeScenery = useSceneryStore((state) => state.setLargeScenery)
    const setSmallScenery = useSceneryStore((state) => state.setSmallScenery)
@@ -104,18 +115,39 @@ const App: React.FC = () => {
       const connect = () => {
          cleanupSocket?.()
          const nextSocket = createSocket()
+         const restoreInstrumentedSend = DEBUG_TOOLS_ENABLED
+            ? instrumentSocketSend(nextSocket, networkDebugStatsRef)
+            : undefined
          activeSocket = nextSocket
          setSocket(nextSocket)
          setLocalSpawnEffectReady(false)
 
          const handleOpen = () => {
             clearHeartbeat()
+            if (DEBUG_TOOLS_ENABLED && nextSocket.readyState === WebSocket.OPEN) {
+               nextSocket.send(encode({ type: 'debug_subscribe', payload: { enabled: true } }))
+            }
             sendHeartbeat(nextSocket)
             heartbeatInterval = window.setInterval(() => sendHeartbeat(nextSocket), 25000)
          }
 
          const handleMessage = (event) => {
-            const message = decode(event.data) as WebSocketMessage
+            if (DEBUG_TOOLS_ENABLED) {
+               networkDebugStatsRef.current.incomingMessages += 1
+               networkDebugStatsRef.current.incomingBytes += getSocketPayloadByteLength(event.data)
+            }
+
+            let message: WebSocketMessage
+
+            try {
+               message = decode(event.data) as WebSocketMessage
+            } catch (error) {
+               if (DEBUG_TOOLS_ENABLED) {
+                  networkDebugStatsRef.current.decodeErrors += 1
+               }
+               console.error('Unable to decode WebSocket message:', error)
+               return
+            }
 
             if (message.type === 'largeScenery') {
                setLargeScenery(message.payload)
@@ -179,6 +211,15 @@ const App: React.FC = () => {
             if (message.type === 'chatMessage') {
                addChatMessage(message.payload)
             }
+
+            if (message.type === 'voiceChatStatusUpdate') {
+               const { clientId, voiceChatEnabled } = message.payload
+               updateAudioClientsFromDeltas([{ id: clientId, microphone: voiceChatEnabled }])
+            }
+
+            if (message.type === 'debugServerStats' && DEBUG_TOOLS_ENABLED) {
+               networkDebugStatsRef.current.server = message.payload
+            }
          }
 
          const handleClose = () => {
@@ -202,6 +243,7 @@ const App: React.FC = () => {
          nextSocket.addEventListener('error', handleError)
 
          cleanupSocket = () => {
+            restoreInstrumentedSend?.()
             nextSocket.removeEventListener('open', handleOpen)
             nextSocket.removeEventListener('message', handleMessage)
             nextSocket.removeEventListener('close', handleClose)
@@ -246,6 +288,7 @@ const App: React.FC = () => {
       <div style={{ width: '100%', height: '100vh' }}>
          <Canvas dpr={[1, 1.5]} gl={canvasGlOptions} shadows={{ type: PCFSoftShadowMap }}>
              {/* <Stats />  */}
+            {DEBUG_TOOLS_ENABLED && <SceneDebugSampler sceneStatsRef={sceneDebugStatsRef} />}
             <PerspectiveCamera position={[25, 25, 25]} fov={70} makeDefault />
             <color attach="background" args={['#01030a']} />
             <fog attach="fog" color="#040a16" near={FOG_NEAR} far={FOG_FAR} />
@@ -253,7 +296,7 @@ const App: React.FC = () => {
             <Sky />
             <Suspense fallback={<Loader />}>
                <SceneReadySignal onReady={handleSceneReady} />
-               {socket && <RemotePlayers clientSocket={socket} />}
+               {socket && <RemotePlayers />}
                {socket && <LocalPlayer clientSocket={socket} showSpawnEffect={localSpawnEffectReady} />}
                <Ground />
                <Grass />
@@ -265,6 +308,10 @@ const App: React.FC = () => {
          {socket && <OverlayUIWrapper socket={socket} />}
          {socket && <MobileJoystick />}
          {socket && <PlayerAudioConnection socket={socket} />}
+         {socket && <ChatBubbleTicker />}
+         {DEBUG_TOOLS_ENABLED && (
+            <DebugOverlay socket={socket} networkStatsRef={networkDebugStatsRef} sceneStatsRef={sceneDebugStatsRef} />
+         )}
       </div>
    )
 }
