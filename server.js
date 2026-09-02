@@ -6,6 +6,7 @@ import fs from 'fs'
 import viteConfig from './vite.config.js'
 import { createServer } from 'vite'
 import express from 'express'
+import { getIceServers, warnAboutTurnConfiguration } from './server/utils/iceServers.js'
 import compression from 'compression'
 import http from 'http'
 
@@ -39,38 +40,19 @@ if (process.env.NODE_ENV === 'development') {
    app.use(express.static('dist'))
 }
 
-const DEFAULT_STUN_URLS = ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']
-
-function parseUrlList(value, fallback = []) {
-   if (!value) {
-      return fallback
-   }
-
-   return value
-      .split(',')
-      .map((url) => url.trim())
-      .filter(Boolean)
-}
-
 /**
  * WebRTC only reaches peers behind symmetric NAT through a TURN relay. Serving the list here
- * keeps credentials out of the client bundle and lets them rotate without a rebuild.
+ * keeps credentials out of the client bundle, lets them rotate without a rebuild, and is what
+ * makes short-lived minted credentials possible at all.
  */
-router.get('/ice-servers', (req, res) => {
-   const iceServers = [{ urls: parseUrlList(process.env.STUN_URLS, DEFAULT_STUN_URLS) }]
-   const turnUrls = parseUrlList(process.env.TURN_URLS)
-
-   if (turnUrls.length > 0) {
-      iceServers.push({
-         urls: turnUrls,
-         username: process.env.TURN_USERNAME,
-         credential: process.env.TURN_CREDENTIAL,
-      })
-   }
+router.get('/ice-servers', async (req, res) => {
+   const iceServers = await getIceServers()
 
    res.set('Cache-Control', 'no-store')
    res.json({ iceServers })
 })
+
+warnAboutTurnConfiguration()
 
 router.get('/', async (req, res, next) => {
    try {
