@@ -40,9 +40,17 @@ interface ServerDebugStats {
    outboundBytesPerSecond: number
    droppedOutbound: number
    decodeErrors: number
+   decodeMsAvg: number
+   decodeMsMax: number
    clientUpdateTicks: number
    clientUpdateMsAvg: number
    clientUpdateMsMax: number
+   clientUpdateCollectMsAvg: number
+   clientUpdateEncodeMsAvg: number
+   clientUpdateSendMsAvg: number
+   lastClientUpdateCollectMs: number
+   lastClientUpdateEncodeMs: number
+   lastClientUpdateSendMs: number
    lastClientUpdateCount: number
    lastClientUpdateRecipients: number
    lastClientUpdateEntriesSent: number
@@ -566,6 +574,15 @@ const DebugOverlay: React.FC<DebugOverlayProps> = ({ socket, networkStatsRef, sc
                <StatRow label="visible avg" value={`${server.lastAverageVisiblePlayersPerClient.toFixed(1)} players/client`} />
                <StatRow label="update bytes" value={formatBytes(server.lastClientUpdateBytes)} />
                <StatRow label="tick avg/max" value={`${server.clientUpdateMsAvg.toFixed(2)} / ${server.clientUpdateMsMax.toFixed(2)}ms`} />
+               <StatRow
+                  label="collect/enc/send"
+                  value={`${server.lastClientUpdateCollectMs.toFixed(2)} / ${server.lastClientUpdateEncodeMs.toFixed(2)} / ${server.lastClientUpdateSendMs.toFixed(2)}ms`}
+               />
+               <StatRow
+                  label="avg c/e/s"
+                  value={`${server.clientUpdateCollectMsAvg.toFixed(2)} / ${server.clientUpdateEncodeMsAvg.toFixed(2)} / ${server.clientUpdateSendMsAvg.toFixed(2)}ms`}
+               />
+               <StatRow label="decode avg/max" value={`${server.decodeMsAvg.toFixed(3)} / ${server.decodeMsMax.toFixed(3)}ms`} />
             </section>
          )}
       </aside>
@@ -577,7 +594,7 @@ const styles: Record<string, React.CSSProperties> = {
       position: 'fixed',
       left: 12,
       top: 12,
-      width: 310,
+      width: 350,
       maxHeight: 'calc(100vh - 24px)',
       overflowY: 'auto',
       zIndex: 1000,
@@ -666,7 +683,7 @@ const styles: Record<string, React.CSSProperties> = {
    },
    statRow: {
       display: 'grid',
-      gridTemplateColumns: '92px 1fr',
+      gridTemplateColumns: '122px 1fr',
       gap: 8,
       lineHeight: 1.45,
    },

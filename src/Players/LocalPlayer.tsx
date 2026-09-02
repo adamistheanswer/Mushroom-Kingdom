@@ -22,6 +22,7 @@ import SpawnEffect from './SpawnEffect'
 const LOCAL_CHILD_POSITION = new Vector3(0, 0, 0)
 const LOCAL_CHILD_ROTATION = new Euler(0, 0, 0)
 const DEFAULT_LOCAL_VOICE_STATE = { microphone: false, speaking: false }
+const CLIENT_UPDATE_THROTTLE_MS = 50
 
 function arraysEqual(a: any[], b: any[]): boolean {
    if (a.length !== b.length) return false
@@ -92,7 +93,7 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
                })
             )
             lastSentState.current = currentState
-         }, 30),
+         }, CLIENT_UPDATE_THROTTLE_MS),
       [clientSocket]
    )
 

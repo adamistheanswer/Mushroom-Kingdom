@@ -30,6 +30,10 @@ import DebugOverlay, {
    instrumentSocketSend,
    SceneDebugSampler,
 } from './Components/DebugOverlay'
+import {
+   decodeClientMetadataUpdateBatch,
+   decodeClientMotionUpdateBatch,
+} from '../shared/clientUpdateProtocol.js'
 
 const canvasGlOptions = { powerPreference: 'high-performance' } as const
 const DEBUG_TOOLS_ENABLED = import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug')
@@ -128,7 +132,7 @@ const App: React.FC = () => {
          const handleOpen = () => {
             clearHeartbeat()
             if (DEBUG_TOOLS_ENABLED && nextSocket.readyState === WebSocket.OPEN) {
-               nextSocket.send(encode({ type: 'debug_subscribe', payload: { enabled: true } }))
+               nextSocket.send(encode({ type: 'debug_subscribe', payload: { enabled: true, role: 'debugClient' } }))
             }
             sendHeartbeat(nextSocket)
             heartbeatInterval = window.setInterval(() => sendHeartbeat(nextSocket), 25000)
@@ -185,19 +189,19 @@ const App: React.FC = () => {
                }
             }
 
-            if (message.type === 'clientUpdates') {
-               if (Array.isArray(message.payload)) {
-                  updateAudioClientsFromDeltas(message.payload)
+            if (message.type === 'clientMotionUpdates' || message.type === 'clientMetadataUpdates') {
+               const clientUpdates = (
+                  message.type === 'clientMotionUpdates'
+                     ? decodeClientMotionUpdateBatch(message.payload)
+                     : decodeClientMetadataUpdateBatch(message.payload)
+               ) as PlayerPositionUpdate[]
 
-                  if (currentClientId) {
-                     updatePlayerDeltas(message.payload, currentClientId)
-                  } else {
-                     pendingDeltas.push(...message.payload)
-                  }
-               } else if (currentClientId) {
-                  updatePlayerPositions(message.payload, currentClientId)
+               updateAudioClientsFromDeltas(clientUpdates)
+
+               if (currentClientId) {
+                  updatePlayerDeltas(clientUpdates, currentClientId)
                } else {
-                  pendingActiveClients = message.payload
+                  pendingDeltas.push(...clientUpdates)
                }
             }
 
