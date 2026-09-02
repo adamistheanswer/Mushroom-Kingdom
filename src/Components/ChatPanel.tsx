@@ -2,6 +2,7 @@ import React, { FormEvent, useEffect, useRef, useState } from 'react'
 import { encode } from '@msgpack/msgpack'
 import { useChatStore } from '../State/chatStore'
 import { useIsMobile } from '../Utils/useIsMobile'
+import PlayersOnlineCount from './PlayersOnlineCount'
 
 interface ChatPanelProps {
    socket: WebSocket
@@ -62,6 +63,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ socket }) => {
 
    return (
       <section className="chat-panel" aria-label="Room chat">
+         <PlayersOnlineCount />
          <div
             id="chat-panel-log"
             className={`chat-panel__log${logOpen ? ' chat-panel__log--open' : ''}`}
