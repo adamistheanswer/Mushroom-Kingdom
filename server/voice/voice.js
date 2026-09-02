@@ -8,7 +8,12 @@ import { getClientSocketById } from '../websockets/socketRegistry.js'
 // tells everyone else whose microphone is live.
 
 const SIGNAL_WINDOW_MS = 10000
-const MAX_SIGNALS_PER_WINDOW = 400
+
+// One connection trickles roughly 10-30 candidates, and a client signals every other player in
+// the room, so the budget has to cover a whole room reconnecting at once - after a page reload,
+// say. Under the old 400 the last few peers of a busy room had their offers silently dropped and
+// never connected at all.
+const MAX_SIGNALS_PER_WINDOW = 1200
 
 // An audio-only offer is a few kilobytes and a candidate a few hundred bytes, so anything larger
 // is not signalling - and relaying it would amplify one client's frame across the room.

@@ -1,7 +1,7 @@
 import compression from 'compression'
 import express from 'express'
 import fs from 'fs'
-import { getIceServers } from '../voice/iceServers.js'
+import { getIceServers, warnAboutTurnConfiguration } from '../utils/iceServers.js'
 
 // mime-db carries no `compressible` flag for FBX, so the default filter would skip the Forest
 // models. They are largely float arrays and shed roughly a third of their bytes, so opt them in.
@@ -28,10 +28,12 @@ async function createViteDevServer() {
    })
 }
 
-function serveIceServers(req, res) {
+async function serveIceServers(req, res) {
    // Relay credentials are short-lived, so a cached response would hand out expired ones.
+   const iceServers = await getIceServers()
+
    res.set('Cache-Control', 'no-store')
-   res.json({ iceServers: getIceServers() })
+   res.json({ iceServers })
 }
 
 // In development the page has to go through vite so its transforms and HMR client are injected;
@@ -57,6 +59,8 @@ export async function createHttpApp() {
    const app = express()
    const router = express.Router()
    const vite = process.env.NODE_ENV === 'development' ? await createViteDevServer() : null
+
+   warnAboutTurnConfiguration()
 
    app.use(compression({ filter: shouldCompress }))
 
