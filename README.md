@@ -44,6 +44,19 @@ Build and run production locally:
 npm run preview
 ```
 
+## Voice chat
+
+Peer-to-peer WebRTC. The server relays signalling and serves the ICE server list from
+`/ice-servers`.
+
+**A deployment needs a TURN relay.** Without one, voice works between some pairs of players and
+not others, with no error on either side. Create a TURN Server app at **dash.cloudflare.com ->
+Realtime -> TURN** and set `TURN_TOKEN_ID` and `TURN_API_TOKEN`.
+
+`/ice-servers` is public, so it never serves the key itself - it exchanges it for a credential
+that expires after two hours. If Cloudflare cannot be reached, voice degrades to STUN rather than
+taking the game down.
+
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first

@@ -12,7 +12,11 @@ type PeerRecord = {
    connectTimer: number
    iceGraceTimer: number
    bytesReceived: number
+   packetsReceived: number
    mediaProgressAt: number
+   lastSampleAt: number
+   relayCandidates: number
+   lastIceRestartAt: number
 }
 
 type PeerMap = Record<string, PeerRecord>
@@ -44,12 +48,28 @@ const RECONNECT_MAX_DELAY = 15000
 const MAX_RECONNECT_ATTEMPTS = 10
 const RECONNECT_GIVE_UP_COOLDOWN = 60000
 
-const MEDIA_WATCHDOG_INTERVAL = 3000
-const MEDIA_STALL_TIMEOUT = 10000
+const MEDIA_WATCHDOG_INTERVAL = 2000
 
-const SPEAKING_THRESHOLD = 0.035
-const SPEAKING_START_DELAY = 80
-const SPEAKING_STOP_DELAY = 240
+/**
+ * Recovery is staged. An ICE restart re-uses the peer connection and costs a few hundred
+ * milliseconds, so it gets first refusal; only a connection still silent long after that is worth
+ * tearing down and rebuilding, because a rebuild is seconds of guaranteed silence plus a fresh
+ * round of signalling. A single 10s teardown fired on ordinary quiet and turned healthy calls
+ * into a rebuild loop.
+ */
+const MEDIA_ICE_RESTART_TIMEOUT = 8000
+const MEDIA_ICE_RESTART_COOLDOWN = 10000
+const MEDIA_STALL_TIMEOUT = 20000
+
+/**
+ * Speech through a laptop microphone with noise suppression on sits around 0.02-0.08 RMS, so a
+ * single 0.035 gate silently dropped anyone talking quietly or sitting back from the mic.
+ * Separate on/off levels give hysteresis: easy to trip, slow to fall back.
+ */
+const SPEAKING_ON_THRESHOLD = 0.016
+const SPEAKING_OFF_THRESHOLD = 0.009
+const SPEAKING_START_DELAY = 60
+const SPEAKING_STOP_DELAY = 320
 const ANALYSER_FALLBACK_INTERVAL = 250
 
 const ICE_SERVERS_TTL = 5 * 60 * 1000
@@ -59,26 +79,52 @@ const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
 ]
 
-const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+/**
+ * Echo cancellation and noise suppression stay on - without them a room full of players on
+ * laptop speakers howls - but voice isolation is asked for explicitly off. It is a much more
+ * aggressive machine-learning gate than plain noise suppression, and where a browser or OS turns
+ * it on by default it gates quiet or distant speech away entirely.
+ */
+const AUDIO_CONSTRAINTS = {
    echoCancellation: { ideal: true },
    noiseSuppression: { ideal: true },
    autoGainControl: { ideal: true },
+   voiceIsolation: { ideal: false },
    channelCount: { ideal: 1 },
    sampleRate: { ideal: 48000 },
    sampleSize: { ideal: 16 },
-}
+} as MediaTrackConstraints
 
+/**
+ * `usedtx` is explicitly off rather than merely unset. Discontinuous transmission stops sending
+ * the instant its voice detector decides nobody is talking, which clips the first syllable of a
+ * sentence and leaves the receiver with no packets to measure - between them, the two things that
+ * made calls here feel dead. A handful of mono voice streams do not need the saved bytes.
+ */
 const OPUS_PARAMS: Record<string, string> = {
    stereo: '0',
    'sprop-stereo': '0',
-   maxaveragebitrate: '32000',
-   usedtx: '1',
+   maxaveragebitrate: '40000',
+   usedtx: '0',
    useinbandfec: '1',
+   minptime: '10',
 }
 
 let cachedIceServers: RTCIceServer[] = DEFAULT_ICE_SERVERS
 let iceServersFetchedAt = 0
 let iceServersPromise: Promise<RTCIceServer[]> | null = null
+
+function hasTurnServer(servers: RTCIceServer[]) {
+   return servers.some((server) => {
+      const urls = Array.isArray(server.urls) ? server.urls : [server.urls]
+      return urls.some((url) => typeof url === 'string' && /^turns?:/i.test(url))
+   })
+}
+
+// Whether the fetched ICE list actually contains a relay. A peer that fails having gathered no
+// relay candidate, on a deployment with no TURN configured, is the one case worth naming to the
+// player rather than retrying silently.
+let turnConfigured = false
 
 /**
  * TURN relays are what keep voice working behind symmetric NAT, so the server is asked for the
@@ -105,12 +151,19 @@ async function loadIceServers(): Promise<RTCIceServer[]> {
 
             cachedIceServers = servers.length > 0 ? servers : DEFAULT_ICE_SERVERS
             iceServersFetchedAt = Date.now()
+
+            if (!hasTurnServer(cachedIceServers)) {
+               console.warn(
+                  'Voice chat has no TURN relay configured. Peers behind symmetric NAT (most mobile networks and many corporate firewalls) will not be able to hear each other. Set TURN_TOKEN_ID and TURN_API_TOKEN on the server.'
+               )
+            }
          } catch (error) {
             // Never let ICE discovery block a call - public STUN still covers most networks.
             cachedIceServers = DEFAULT_ICE_SERVERS
          } finally {
             window.clearTimeout(timeout)
             iceServersPromise = null
+            turnConfigured = hasTurnServer(cachedIceServers)
          }
 
          return cachedIceServers
@@ -135,6 +188,22 @@ function getSharedAudioContext(): AudioContext | null {
    // One context for every stream: browsers cap how many can exist at once.
    sharedAudioContext = new AudioContextConstructor()
    return sharedAudioContext
+}
+
+/**
+ * A suspended AudioContext hands `getByteTimeDomainData` a flat buffer, so every speaking
+ * indicator reads silent while the audio elements happily play on. Resuming has to be attempted
+ * inside the click that starts voice chat, and then re-attempted whenever the browser suspends it
+ * again (tab backgrounding on mobile does exactly that).
+ */
+function resumeSharedAudioContext() {
+   const audioContext = getSharedAudioContext()
+
+   if (!audioContext || audioContext.state !== 'suspended') {
+      return
+   }
+
+   void audioContext.resume().catch(() => onNextUserGesture(() => void audioContext.resume().catch(() => {})))
 }
 
 const PEER_EVENTS = ['signal', 'connect', 'stream', 'iceStateChange', 'close'] as const
@@ -223,6 +292,12 @@ function preferOpusVoiceSettings(sdp: string) {
    }
 }
 
+function renegotiate(peer: SimplePeer.Instance) {
+   // A real simple-peer method that @types/simple-peer never declared. On the initiator it builds
+   // a fresh offer, which is how a restarted ICE session reaches the far end at all.
+   ;(peer as any).negotiate?.()
+}
+
 function shouldInitiate(localId: string, remoteId: string) {
    return localId > remoteId
 }
@@ -297,17 +372,37 @@ export const useVoiceChat = (socket: WebSocket | null, clientId: string) => {
       lastTickRef.current = performance.now()
       const now = lastTickRef.current
 
+      // Nothing below can measure anything through a suspended context, so take every tick as an
+      // opportunity to get it running again.
+      if (sharedAudioContext && sharedAudioContext.state === 'suspended') {
+         resumeSharedAudioContext()
+      }
+
       for (const targetId in speechAnalysisRef.current) {
          const analysis = speechAnalysisRef.current[targetId]
          analysis.analyser.getByteTimeDomainData(analysis.samples)
 
          let sum = 0
+         let peak = 0
+
          for (let index = 0; index < analysis.samples.length; index++) {
             const value = (analysis.samples[index] - 128) / 128
             sum += value * value
+            const magnitude = value < 0 ? -value : value
+            if (magnitude > peak) {
+               peak = magnitude
+            }
          }
 
-         const nextSpeaking = Math.sqrt(sum / analysis.samples.length) > SPEAKING_THRESHOLD
+         // RMS alone under-reads speech that is mostly consonants or arrives in short bursts, and
+         // peak alone trips on a single clipped sample. Taking the larger of the two catches
+         // quiet talkers without turning a keyboard tap into a whole sentence.
+         const level = Math.max(Math.sqrt(sum / analysis.samples.length), peak * 0.35)
+
+         // Hysteresis: crossing up is a lower bar than staying up, so the indicator does not
+         // strobe on the natural gaps between words.
+         const threshold = analysis.speaking ? SPEAKING_OFF_THRESHOLD : SPEAKING_ON_THRESHOLD
+         const nextSpeaking = level > threshold
 
          if (nextSpeaking !== analysis.pendingSpeaking) {
             analysis.pendingSpeaking = nextSpeaking
@@ -426,9 +521,7 @@ export const useVoiceChat = (socket: WebSocket | null, clientId: string) => {
             return
          }
 
-         if (audioContext.state === 'suspended') {
-            void audioContext.resume().catch(() => onNextUserGesture(() => void audioContext.resume()))
-         }
+         resumeSharedAudioContext()
       },
       [startAnalysisLoop, stopSpeakingDetection]
    )
@@ -723,55 +816,121 @@ export const useVoiceChat = (socket: WebSocket | null, clientId: string) => {
    /**
     * ICE reporting `connected` is not proof that audio is arriving: a dead relay or a half-open
     * connection reads as healthy while the room hears silence, which is the failure players
-    * notice most. Opus DTX keeps emitting comfort noise while nobody is talking, so a peer whose
-    * inbound byte count stops moving altogether is genuinely broken rather than merely quiet.
+    * notice most. With DTX turned off (see OPUS_PARAMS) a live sender emits packets continuously
+    * whether or not anyone is talking, so a stalled inbound packet count now means a broken
+    * connection rather than a quiet one - a distinction the old byte-only check could not make,
+    * which is what had it tearing down perfectly good calls every ten seconds.
     */
+   /**
+    * An ICE restart re-uses the peer connection and its DTLS session, so it recovers in a fraction
+    * of the time a rebuild takes. Only the initiator can offer one - simple-peer builds offers on
+    * that side alone - and roles are fixed by id, so exactly one end of each pair ever attempts it.
+    * Returns false when it was not attempted or could not be started, leaving the caller to decide
+    * whether to rebuild.
+    */
+   const tryIceRestart = useCallback((targetId: string, record: PeerRecord) => {
+      const connection = (record.peer as any)?._pc as RTCPeerConnection | undefined
+      const now = Date.now()
+
+      if (
+         !record.initiator ||
+         typeof connection?.restartIce !== 'function' ||
+         now - record.lastIceRestartAt <= MEDIA_ICE_RESTART_COOLDOWN
+      ) {
+         return false
+      }
+
+      record.lastIceRestartAt = now
+
+      try {
+         connection.restartIce()
+         renegotiate(record.peer)
+         return true
+      } catch (error) {
+         console.warn(`ICE restart for ${targetId} failed`, error)
+         return false
+      }
+   }, [])
+
+   const samplePeerHealth = useCallback(async (targetId: string, record: PeerRecord) => {
+      const connection = (record.peer as any)?._pc as RTCPeerConnection | undefined
+
+      if (typeof connection?.getStats !== 'function') {
+         return null
+      }
+
+      let stats: RTCStatsReport
+
+      try {
+         stats = await connection.getStats()
+      } catch (error) {
+         // getStats rejects once a connection is closing; the close handler owns that case.
+         return null
+      }
+
+      // Awaiting the stats gives the peer time to be torn down underneath us.
+      if (peersRef.current[targetId] !== record || record.disposed) {
+         return null
+      }
+
+      let bytesReceived = 0
+      let packetsReceived = 0
+
+      stats.forEach((report: any) => {
+         if (report.type === 'inbound-rtp' && report.kind !== 'video' && report.mediaType !== 'video') {
+            bytesReceived += report.bytesReceived ?? 0
+            packetsReceived += report.packetsReceived ?? 0
+         }
+      })
+
+      const now = Date.now()
+      const progressed = packetsReceived > record.packetsReceived || bytesReceived > record.bytesReceived
+
+      record.bytesReceived = bytesReceived
+      record.packetsReceived = packetsReceived
+      record.lastSampleAt = now
+
+      if (progressed) {
+         record.mediaProgressAt = now
+      }
+
+      return { connection, progressed, now }
+   }, [])
+
    const sweepMediaFlow = useCallback(
       async (targetIds: string[]) => {
          for (const targetId of targetIds) {
             const record = peersRef.current[targetId]
 
-            if (!record || !record.connected || record.disposed) {
+            if (!record || record.disposed) {
                continue
             }
 
-            const connection = (record.peer as any)?._pc as RTCPeerConnection | undefined
-            if (typeof connection?.getStats !== 'function') {
+            const sample = record.connected ? await samplePeerHealth(targetId, record) : null
+
+            if (!sample || sample.progressed) {
                continue
             }
 
-            let received = 0
+            const quietFor = sample.now - record.mediaProgressAt
 
-            try {
-               const stats = await connection.getStats()
-               stats.forEach((report: any) => {
-                  if (report.type === 'inbound-rtp' && report.kind !== 'video') {
-                     received += report.bytesReceived ?? 0
-                  }
-               })
-            } catch (error) {
-               // getStats rejects once a connection is closing; the close handler owns that case.
+            // A stall inside the restart window is worth one cheap ICE restart; if that is not
+            // available the stall timeout below is the backstop.
+            if (quietFor > MEDIA_ICE_RESTART_TIMEOUT && quietFor <= MEDIA_STALL_TIMEOUT) {
+               if (tryIceRestart(targetId, record)) {
+                  console.warn(`Audio from ${targetId} has stalled, restarting ICE`)
+               }
+
                continue
             }
 
-            // Awaiting the stats gives the peer time to be torn down underneath us.
-            if (peersRef.current[targetId] !== record || record.disposed) {
-               continue
-            }
-
-            if (received > record.bytesReceived) {
-               record.bytesReceived = received
-               record.mediaProgressAt = Date.now()
-               continue
-            }
-
-            if (Date.now() - record.mediaProgressAt > MEDIA_STALL_TIMEOUT) {
-               console.warn(`No audio arriving from ${targetId}, rebuilding the connection`)
+            if (quietFor > MEDIA_STALL_TIMEOUT) {
+               console.warn(`No audio from ${targetId} for ${Math.round(quietFor / 1000)}s, rebuilding`)
                restartPeer(targetId)
             }
          }
       },
-      [restartPeer]
+      [restartPeer, samplePeerHealth, tryIceRestart]
    )
 
    const checkMediaFlow = useCallback(async () => {
@@ -935,23 +1094,49 @@ export const useVoiceChat = (socket: WebSocket | null, clientId: string) => {
                   connectTimer: 0,
                   iceGraceTimer: 0,
                   bytesReceived: 0,
+                  packetsReceived: 0,
                   mediaProgressAt: 0,
+                  lastSampleAt: Date.now(),
+                  relayCandidates: 0,
+                  lastIceRestartAt: 0,
                }
 
                peersRef.current[targetId] = record
 
                // A peer that never reaches `connect` would otherwise sit half-open forever.
                record.connectTimer = window.setTimeout(() => {
-                  if (peersRef.current[targetId] === record && !record.connected) {
-                     console.warn(`Voice connection to ${targetId} timed out, retrying`)
-                     restartPeer(targetId)
+                  if (peersRef.current[targetId] !== record || record.connected) {
+                     return
                   }
+
+                  // Failing with no relay candidate at all is the signature of a deployment
+                  // missing TURN, and it is otherwise invisible: both players see a working
+                  // microphone and hear nothing. The player cannot fix the server, but changing
+                  // network genuinely can help - a phone on mobile data is the common case - so
+                  // that is what the message suggests. The cause goes to the console, for us.
+                  if (record.relayCandidates === 0 && !turnConfigured) {
+                     setVoiceError("Couldn't connect to another player. Try a different Wi-Fi or mobile network.")
+                     console.warn(
+                        `No relay candidates for ${targetId} and no TURN configured - players on strict networks will not connect. Set TURN_TOKEN_ID and TURN_API_TOKEN.`
+                     )
+                  }
+
+                  console.warn(`Voice connection to ${targetId} timed out, retrying`)
+                  restartPeer(targetId)
                }, CONNECT_TIMEOUT)
 
                peer.on('signal', (signal) => {
                   if (peersRef.current[targetId] !== record) {
                      return
                   }
+
+                  // Counting relay candidates is the only way to tell "TURN is configured" from
+                  // "TURN actually works" - a wrong credential gathers nothing and says nothing.
+                  const candidate = (signal as any)?.candidate?.candidate
+                  if (typeof candidate === 'string' && / typ relay/.test(candidate)) {
+                     record.relayCandidates += 1
+                  }
+
                   sendSignal(targetId, signal)
                })
 
@@ -962,6 +1147,7 @@ export const useVoiceChat = (socket: WebSocket | null, clientId: string) => {
 
                   record.connected = true
                   record.mediaProgressAt = Date.now()
+                  record.lastSampleAt = Date.now()
                   window.clearTimeout(record.connectTimer)
                   window.clearTimeout(record.iceGraceTimer)
                   record.iceGraceTimer = 0
@@ -1008,7 +1194,17 @@ export const useVoiceChat = (socket: WebSocket | null, clientId: string) => {
                      return
                   }
 
-                  if (state === 'failed' || state === 'closed') {
+                  if (state === 'failed') {
+                     // A failed connection is definitive, so anything an ICE restart cannot take
+                     // over has to be rebuilt right away rather than waiting for the watchdog.
+                     if (!tryIceRestart(targetId, record)) {
+                        restartPeer(targetId)
+                     }
+
+                     return
+                  }
+
+                  if (state === 'closed') {
                      restartPeer(targetId)
                   }
                })
@@ -1050,6 +1246,7 @@ export const useVoiceChat = (socket: WebSocket | null, clientId: string) => {
          scheduleReconnect,
          sendSignal,
          startMediaWatchdog,
+         tryIceRestart,
       ]
    )
 
@@ -1344,6 +1541,11 @@ export const useVoiceChat = (socket: WebSocket | null, clientId: string) => {
 
       voiceChatEnabledRef.current = true
       setVoiceError(null)
+
+      // Still inside the click that started voice chat, so the browser will honour this. Waiting
+      // until after getUserMedia resolves loses the gesture, and a suspended context leaves every
+      // speaking indicator stuck at silent while the call itself plays on.
+      resumeSharedAudioContext()
 
       let stream: MediaStream
 
