@@ -1,8 +1,12 @@
-import { encode } from '@msgpack/msgpack'
-import { getClientSocketById } from './broadcastHandler.js'
 import { WebSocket } from 'ws'
+import { getClient, setClient } from '../clients/clientState.js'
+import { markClientUpdated } from '../clients/clientUpdates.js'
+import { broadcastMessage, encodeMessage, MAX_BUFFERED_AMOUNT } from '../websockets/messages.js'
+import { getClientSocketById } from '../websockets/socketRegistry.js'
 
-const MAX_BUFFERED_AMOUNT = 256 * 1024
+// Audio itself is peer-to-peer; the server only carries the WebRTC handshake and the flag that
+// tells everyone else whose microphone is live.
+
 const SIGNAL_WINDOW_MS = 10000
 
 // One connection trickles roughly 10-30 candidates, and a client signals every other player in
@@ -14,6 +18,25 @@ const MAX_SIGNALS_PER_WINDOW = 1200
 // An audio-only offer is a few kilobytes and a candidate a few hundred bytes, so anything larger
 // is not signalling - and relaying it would amplify one client's frame across the room.
 const MAX_SIGNAL_BYTES = 16 * 1024
+
+/**
+ * The id comes from the connection, never the payload, so nobody can flip another player's mic.
+ * The flag rides the batched client update as well as its own broadcast, because a player who
+ * joins mid-call needs it in the roster and one already here needs it immediately.
+ */
+export function handleVoiceChatStatus(clientId, message) {
+   const voiceChatEnabled = message.payload?.voiceChatEnabled === true
+   const clientData = getClient(clientId)
+
+   if (!clientData || clientData.microphone === voiceChatEnabled) {
+      return
+   }
+
+   clientData.microphone = voiceChatEnabled
+   setClient(clientId, clientData)
+   markClientUpdated(clientId, 'microphone')
+   broadcastMessage('voiceChatStatusUpdate', { clientId, voiceChatEnabled })
+}
 
 function isRateLimited(senderSocket) {
    const now = Date.now()
@@ -33,10 +56,10 @@ function notifySignalUnavailable(senderSocket, targetId) {
    }
 
    // Tells the sender to stop retrying immediately rather than waiting out its own timeouts.
-   senderSocket.send(encode({ type: 'signalUnavailable', payload: { targetId } }))
+   senderSocket.send(encodeMessage('signalUnavailable', { targetId }))
 }
 
-export function handleSignalMessage(senderId, message, senderSocket, frameBytes = 0) {
+export function handleVoiceSignal(senderId, message, senderSocket, frameBytes = 0) {
    const payload = message?.payload
    const targetId = payload?.targetId
 
@@ -67,5 +90,5 @@ export function handleSignalMessage(senderId, message, senderSocket, frameBytes 
 
    // `senderId` is stamped from the connection rather than trusted from the payload, so a client
    // cannot impersonate another player's signalling.
-   targetSocket.send(encode({ type: 'signal', payload: { targetId, senderId, signal: payload.signal } }))
+   targetSocket.send(encodeMessage('signal', { targetId, senderId, signal: payload.signal }))
 }

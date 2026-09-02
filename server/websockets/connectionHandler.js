@@ -1,172 +1,96 @@
-import { setClient, removeClient, getClientsAsMap } from '../state/clientState.js'
-import { getLargeScenery, setLargeScenery, getSmallScenery, setSmallScenery } from '../state/sceneryState.js'
-import { clearChatMessages, markChatMessagesDisconnected } from '../state/chatState.js'
-import { decode } from '@msgpack/msgpack'
-import { uid } from '../utils/utils.js'
-import { generateLargeScenery, generateSmallScenery } from '../utils/generateScenery.js'
-import { sendChatMessages, sendClientId, sendLargeScenery, sendSmallScenery } from './InitialisationHander.js'
-import {
-   broadcastActiveClients,
-   broardcastClientDisconnect,
-   markClientUpdated,
-   broadcastClientUpdates,
-   broadcastWebSocketDebugStats,
-   recordInboundWebSocketMessage,
-   recordWebSocketDecodeError,
-   registerClientSocket,
-   unregisterClientSocket,
-   getPayloadByteLength,
-} from './broadcastHandler.js'
-import {
-   handleStateSetPlayerAction,
-   handleStateSetPlayerMovement,
-   handleStateSetVoiceChatStatus,
-   handleStateSetUserName,
-   handleChatMessage,
-} from './stateHandler.js'
-import { handleSignalMessage } from './signalHandler.js'
+import { clearChatHistory, getChatMessages, markChatMessagesDisconnected } from '../chat/chat.js'
+import { clearClientMovementQueue } from '../clients/clientMessages.js'
+import { getAllClients, getClientCount, removeClient, setClient } from '../clients/clientState.js'
+import { broadcastClientDisconnect, markClientUpdated } from '../clients/clientUpdates.js'
+import { uid } from '../utils/uid.js'
+import { clearWorld, ensureWorldGenerated, getLargeScenery, getSmallScenery } from '../world/world.js'
+import { routeClientMessage } from './messageRouter.js'
+import { encodeMessage, sendEncoded, sendMessage } from './messages.js'
+import { registerClientSocket, unregisterClientSocket } from './socketRegistry.js'
 
-const STATE_SET_USERNAME = 'state_set_username'
-const STATE_SET_CLIENT_ACTION = 'state_set_client_action'
-const STATE_SET_CLIENT_MOVEMENT = 'move'
-const STATE_SET_VOICE_CHAT_STATUS = 'state_set_client_voice_chat_status'
-const HEARTBEAT = 'heartbeat'
-const CHAT = 'chat'
-const SIGNAL = 'signal'
-const DEBUG_SUBSCRIBE = 'debug_subscribe'
-
-export function handleConnection(socket) {
-   const clientId = uid()
-   socket.clientId = clientId
-   registerClientSocket(clientId, socket)
-   console.log(`User ${clientId} connected - ${getClientsAsMap().size + 1} active users`)
-
-   setClient(clientId, {
+function createSpawnState() {
+   return {
       position: [0, 0, 0],
       rotation: [0, 0, 0],
       action: '3',
       userName: '',
       microphone: false,
-   })
+   }
+}
+
+let encodedSceneryCache = null
+
+function getEncodedSceneryFrames() {
+   const largeScenery = getLargeScenery()
+   const smallScenery = getSmallScenery()
+
+   // clearWorld() replaces both arrays, so identity is enough to expire stale encoded frames.
+   if (
+      !encodedSceneryCache ||
+      encodedSceneryCache.largeScenery !== largeScenery ||
+      encodedSceneryCache.smallScenery !== smallScenery
+   ) {
+      encodedSceneryCache = {
+         largeScenery,
+         smallScenery,
+         largeFrame: encodeMessage('largeScenery', largeScenery),
+         smallFrame: encodeMessage('smallScenery', smallScenery),
+      }
+   }
+
+   return encodedSceneryCache
+}
+
+/**
+ * Everything a client needs before it can render the world. The id goes first so the roster that
+ * follows can be read with one entry already known to be the player's own.
+ */
+function sendJoinSnapshot(socket, clientId) {
+   const sceneryFrames = getEncodedSceneryFrames()
+
+   sendMessage(socket, 'clientId', clientId)
+   sendMessage(socket, 'activeClients', getAllClients())
+   sendEncoded(socket, sceneryFrames.largeFrame)
+   sendEncoded(socket, sceneryFrames.smallFrame)
+   sendMessage(socket, 'chatMessages', getChatMessages())
+}
+
+export function handleConnection(socket) {
+   const clientId = uid()
+
+   registerClientSocket(clientId, socket)
+   setClient(clientId, createSpawnState())
    markClientUpdated(clientId)
+   ensureWorldGenerated()
 
-   sendClientId(socket, clientId)
-   broadcastActiveClients(socket)
+   console.log(`User ${clientId} connected - ${getClientCount()} active users`)
 
-   if (getLargeScenery().length === 0) {
-      setLargeScenery(generateLargeScenery())
-   }
+   sendJoinSnapshot(socket, clientId)
 
-   if (getSmallScenery().length === 0) {
-      setSmallScenery(generateSmallScenery())
-   }
-
-   sendLargeScenery(socket)
-   sendSmallScenery(socket)
-   sendChatMessages(socket)
-
-   socket.on('message', (data) => {
-      recordInboundWebSocketMessage(data)
-
-      // Measured on the raw frame so an oversized signal costs nothing to reject.
-      const frameBytes = getPayloadByteLength(data)
-      let message
-
-      try {
-         message = decode(data)
-      } catch (error) {
-         recordWebSocketDecodeError()
-         // A malformed frame must not take the connection - or the process - down with it.
-         console.warn(`Discarded an undecodable message from ${clientId}`)
-         return
-      }
-
-      if (!message || typeof message.type !== 'string') {
-         return
-      }
-
-      try {
-         switch (message.type) {
-            case STATE_SET_USERNAME:
-               handleStateSetUserName(clientId, message)
-               break
-            case STATE_SET_CLIENT_MOVEMENT:
-               handleStateSetPlayerMovement(clientId, message)
-               break
-            case STATE_SET_CLIENT_ACTION:
-               handleStateSetPlayerAction(clientId, message)
-               break
-            case STATE_SET_VOICE_CHAT_STATUS:
-               handleStateSetVoiceChatStatus(clientId, message)
-               break
-            case SIGNAL:
-               handleSignalMessage(clientId, message, socket, frameBytes)
-               break
-            case CHAT:
-               handleChatMessage(clientId, message)
-               break
-            case HEARTBEAT:
-               break
-            case DEBUG_SUBSCRIBE:
-               socket.debugSubscribed = process.env.NODE_ENV !== 'production' && Boolean(message.payload?.enabled)
-               break
-         }
-      } catch (error) {
-         console.error(`Failed to handle a ${message.type} message from ${clientId}`, error)
-      }
-   })
+   socket.on('message', (data) => routeClientMessage(clientId, socket, data))
 
    socket.on('error', (error) => {
       console.warn(`Socket error for ${clientId}`, error?.message ?? error)
    })
 
-   handleDisconnection(socket, clientId)
-}
-
-function handleDisconnection(socket, clientId) {
    socket.on('close', () => {
-      console.log(`User ${clientId} disconnected - ${getClientsAsMap().size - 1} active users`)
-      unregisterClientSocket(clientId, socket)
-
-      if (getClientsAsMap().size === 1) {
-         setLargeScenery([])
-         setSmallScenery([])
-         clearChatMessages()
-      }
-
-      markChatMessagesDisconnected(clientId)
-      removeClient(clientId)
-      broardcastClientDisconnect(clientId)
+      handleDisconnection(clientId, socket)
    })
 }
 
-let clientUpdatesInterval = null
-let debugStatsInterval = null
+function handleDisconnection(clientId, socket) {
+   unregisterClientSocket(clientId, socket)
+   clearClientMovementQueue(clientId)
+   markChatMessagesDisconnected(clientId)
+   removeClient(clientId)
 
-export function startSendingClientUpdates(intervalMs = 50) {
-   if (clientUpdatesInterval) {
-      stopSendingClientUpdates()
-   }
-   clientUpdatesInterval = setInterval(broadcastClientUpdates, intervalMs)
-}
+   console.log(`User ${clientId} disconnected - ${getClientCount()} active users`)
 
-export function startSendingDebugStats(intervalMs = 1000) {
-   if (debugStatsInterval) {
-      stopSendingDebugStats()
+   // Nothing outlives an empty room; the next arrival gets a freshly generated world and a clean log.
+   if (getClientCount() === 0) {
+      clearWorld()
+      clearChatHistory()
    }
-   debugStatsInterval = setInterval(broadcastWebSocketDebugStats, intervalMs)
-}
 
-function stopSendingClientUpdates() {
-   if (clientUpdatesInterval) {
-      clearInterval(clientUpdatesInterval)
-      clientUpdatesInterval = null
-   }
-}
-
-function stopSendingDebugStats() {
-   if (debugStatsInterval) {
-      clearInterval(debugStatsInterval)
-      debugStatsInterval = null
-   }
+   broadcastClientDisconnect(clientId)
 }

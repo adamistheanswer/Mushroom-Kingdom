@@ -12,7 +12,6 @@ export interface PlayerSnapshotData {
 export interface PlayerPositionUpdate extends PlayerSnapshotData {
    id: string
    seq?: number
-   serverTime?: number
 }
 
 export interface RemotePlayerPosition {
@@ -24,7 +23,6 @@ export interface RemotePlayerPosition {
    microphone?: boolean
    showSpawnEffect: boolean
    seq: number
-   serverTime: number
 }
 
 export interface PlayerPositionsStore {
@@ -56,7 +54,6 @@ function createRemotePlayer(
    clientId: string,
    data: PlayerSnapshotData,
    seq = 0,
-   serverTime = Date.now(),
    showSpawnEffect = false
 ) {
    return {
@@ -68,15 +65,13 @@ function createRemotePlayer(
       microphone: data.microphone,
       showSpawnEffect,
       seq,
-      serverTime,
    }
 }
 
 function updateRemotePlayer(
    player: RemotePlayerPosition,
    data: PlayerSnapshotData,
-   seq = player.seq,
-   serverTime = player.serverTime
+   seq = player.seq
 ) {
    const shouldPublish = playerMetadataChanged(player, data)
 
@@ -93,7 +88,6 @@ function updateRemotePlayer(
       player.microphone = data.microphone
    }
    player.seq = seq
-   player.serverTime = serverTime
 
    return shouldPublish
 }
@@ -155,16 +149,15 @@ export const usePlayerPositionsStore = create<PlayerPositionsStore>()((set, get)
 
          const currentClientData = playerPositions.get(clientId)
          const seq = nextClientData.seq ?? 0
-         const serverTime = nextClientData.serverTime ?? Date.now()
 
          if (currentClientData) {
-            if (seq > 0 && seq <= currentClientData.seq) {
+            if (seq > 0 && seq < currentClientData.seq) {
                continue
             }
 
-            shouldPublish = updateRemotePlayer(currentClientData, nextClientData, seq, serverTime) || shouldPublish
+            shouldPublish = updateRemotePlayer(currentClientData, nextClientData, seq) || shouldPublish
          } else {
-            playerPositions.set(clientId, createRemotePlayer(clientId, nextClientData, seq, serverTime, true))
+            playerPositions.set(clientId, createRemotePlayer(clientId, nextClientData, seq, true))
             shouldPublish = true
          }
       }
