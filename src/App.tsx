@@ -3,11 +3,13 @@ import { Canvas } from '@react-three/fiber'
 import { PerspectiveCamera, Stats } from '@react-three/drei'
 import Lighting from './Environment/Lighting'
 import Ground from './Environment/Ground'
-import Grass from './Environment/Grass'
+import Grass, { DEFAULT_GRASS_WIND_SETTINGS } from './Environment/Grass'
+import GrassWindVisualizer from './Environment/GrassWindVisualizer'
 import Forest from './Environment/Forest'
 import BoundaryWalls from './Environment/BoundaryWalls'
 import Sky from './Environment/Sky'
 import Loader from './Components/Loader'
+import GrassWindDebugPanel from './Components/GrassWindDebugPanel'
 import RemotePlayers from './Players/RemotePlayers'
 import LocalPlayer from './Players/LocalPlayer'
 import useUserStore from './State/userStore'
@@ -37,6 +39,8 @@ import {
 
 const canvasGlOptions = { powerPreference: 'high-performance' } as const
 const DEBUG_TOOLS_ENABLED = import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug')
+const GRASS_WIND_TUNING_ENABLED = import.meta.env.DEV
+const DEFAULT_GRASS_WIND_SETTINGS_KEY = JSON.stringify(DEFAULT_GRASS_WIND_SETTINGS)
 
 function createSocket() {
    const protocol = window.location.protocol.includes('https') ? 'wss' : 'ws'
@@ -65,6 +69,12 @@ const App: React.FC = () => {
    const [localSpawnEffectReady, setLocalSpawnEffectReady] = useState(false)
    const networkDebugStatsRef = useRef(createNetworkDebugStats())
    const sceneDebugStatsRef = useRef(createSceneDebugStats())
+   const [grassWindSettings, setGrassWindSettings] = useState(() => ({ ...DEFAULT_GRASS_WIND_SETTINGS }))
+   const defaultGrassWindSettingsKeyRef = useRef(DEFAULT_GRASS_WIND_SETTINGS_KEY)
+   const [grassWindVisualizerEnabled, setGrassWindVisualizerEnabled] = useState(true)
+   const [grassWindVisualizerHeight, setGrassWindVisualizerHeight] = useState(9)
+   const [grassWindVisualizerOpacity, setGrassWindVisualizerOpacity] = useState(1)
+   const [grassWindVisualizerSize, setGrassWindVisualizerSize] = useState(720)
    const setClientId = useUserStore((state) => state.setClientId)
    const setLargeScenery = useSceneryStore((state) => state.setLargeScenery)
    const setSmallScenery = useSceneryStore((state) => state.setSmallScenery)
@@ -80,6 +90,15 @@ const App: React.FC = () => {
    const clearChatMessages = useChatStore((state) => state.clearMessages)
 
    useVisualViewport()
+
+   useEffect(() => {
+      if (defaultGrassWindSettingsKeyRef.current === DEFAULT_GRASS_WIND_SETTINGS_KEY) {
+         return
+      }
+
+      defaultGrassWindSettingsKeyRef.current = DEFAULT_GRASS_WIND_SETTINGS_KEY
+      setGrassWindSettings({ ...DEFAULT_GRASS_WIND_SETTINGS })
+   }, [DEFAULT_GRASS_WIND_SETTINGS_KEY])
 
    const handleSceneReady = useCallback(() => {
       setSceneReady(true)
@@ -306,7 +325,15 @@ const App: React.FC = () => {
                {socket && <RemotePlayers />}
                {socket && <LocalPlayer clientSocket={socket} showSpawnEffect={localSpawnEffectReady} />}
                <Ground />
-               <Grass />
+               <Grass windSettings={grassWindSettings} />
+               {GRASS_WIND_TUNING_ENABLED && grassWindVisualizerEnabled && (
+                  <GrassWindVisualizer
+                     settings={grassWindSettings}
+                     height={grassWindVisualizerHeight}
+                     opacity={grassWindVisualizerOpacity}
+                     size={grassWindVisualizerSize}
+                  />
+               )}
                <Forest />
                <BoundaryWalls />
             </Suspense>
@@ -323,6 +350,20 @@ const App: React.FC = () => {
          {socket && <ChatBubbleTicker />}
          {DEBUG_TOOLS_ENABLED && (
             <DebugOverlay socket={socket} networkStatsRef={networkDebugStatsRef} sceneStatsRef={sceneDebugStatsRef} />
+         )}
+         {GRASS_WIND_TUNING_ENABLED && (
+            <GrassWindDebugPanel
+               settings={grassWindSettings}
+               visualizerEnabled={grassWindVisualizerEnabled}
+               visualizerHeight={grassWindVisualizerHeight}
+               visualizerOpacity={grassWindVisualizerOpacity}
+               visualizerSize={grassWindVisualizerSize}
+               onChange={setGrassWindSettings}
+               onVisualizerEnabledChange={setGrassWindVisualizerEnabled}
+               onVisualizerHeightChange={setGrassWindVisualizerHeight}
+               onVisualizerOpacityChange={setGrassWindVisualizerOpacity}
+               onVisualizerSizeChange={setGrassWindVisualizerSize}
+            />
          )}
       </div>
    )
