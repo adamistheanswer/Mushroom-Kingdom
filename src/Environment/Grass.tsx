@@ -56,15 +56,357 @@ const GRASS_BEND_SQUASH = 0.58
 const GRASS_CRUSH_SQUASH = 0.34
 
 const WIND_MAP_SIZE = 256
-const WIND_SWAY_WORLD_SCALE = 0.0125
-const WIND_GUST_WORLD_SCALE = 0.0034
-// Scroll rates are in uv/second; divided by the world scale above they are the speed the wind
-// actually travels across the meadow. The shipped value-noise wind moved at ~9.3 units/second,
-// and anything much slower than that reads as a still field rather than a breeze.
-const WIND_SWAY_SCROLL = WIND_SWAY_WORLD_SCALE * 9.2
-const WIND_GUST_SCROLL = WIND_GUST_WORLD_SCALE * 8.8
-// Per-blade offset into the sway lookup, in uv per unit of the blade's stored phase (0..60).
-const WIND_SWAY_BLADE_JITTER = 0.003
+
+
+const GUST_LEAD_TEXELS = 10
+
+/**
+ * Wind is three things happening at once on three different timescales, and the reason a
+ * meadow reads as a meadow is that they are independent of one another.
+ *
+ * The breeze never stops. It is broad and slow, neighbouring blades share it, and it is what
+ * keeps the field alive in the gaps between everything else.
+ *
+ * Gusts are events. A front arrives, sweeps through, and leaves, and then nothing happens for
+ * a while. The important word is "a while" - if gusts arrive on a schedule the field turns into
+ * a flag, and no amount of noise warping a carrier wave's phase will hide the beat underneath
+ * it. So there is no carrier here at all: the gust field is plain noise advected downwind and
+ * then thresholded, which gives fronts of uneven width, at uneven spacing, at uneven strength,
+ * because that is simply what noise looks like when you cut it at a level.
+ *
+ * Flutter belongs to the blade rather than to the meadow. It is the only oscillator in here,
+ * and its phase and rate are both hashed per blade, because a shared one reads instantly as the
+ * whole field pulsing on a beat.
+ */
+export interface GrassWindSettings {
+   directionDegrees: number
+   directionVariance: number
+   bendDegrees: number
+   breezeStrength: number
+   breezeScale: number
+   breezeSpeed: number
+   breezeVariation: number
+   flutterStrength: number
+   flutterSpeed: number
+   gustStrength: number
+   gustScale: number
+   gustSpeed: number
+   gustFrequency: number
+   gustSharpness: number
+   gustCrest: number
+   gustRebound: number
+   gustLobing: number
+   responseMin: number
+   responseMax: number
+   clumpResponse: number
+}
+
+// Both scales are one over a world distance, so the numbers look small and the sizes they mean
+// are not: 1/scale is the distance the field repeats over, and the features inside it run from
+// that down to about a third of it. Read them against the 300 unit fog distance to know whether
+// one front crosses the whole view or a dozen ripple across it at once.
+//
+// Tuned on screen rather than derived, so read the shape rather than the individual numbers.
+// Four of these are worth understanding before touching anything, because they are not where
+// the defaults started and they are what gives the field its character.
+//
+// The breeze is off. There is no steady background lean at all, so between fronts the meadow is
+// almost still - a few tenths of a degree of flutter - and every bit of visible motion is a
+// gust. That is why gustFrequency is at the top of its range: with nothing underneath them, the
+// fronts have to be more or less continuous or the field reads as dead.
+//
+// gustScale is at the top of its range too, which makes the fronts small - cells of roughly 40
+// to 125 world units against a 300 unit view, so several ripple across the screen at once
+// rather than one wave sweeping through. Note this shortens the crest's lead as a side effect;
+// see GUST_LEAD_TEXELS.
+//
+// responseMax is below responseMin, which is not a mistake but does invert the reading: the
+// blades with a high hash are the stiff ones here, not the loose ones. Together with the low
+// clumpResponse it holds the whole field's response between 0.14 and 0.4, and the bend budget
+// is spent by the gust and crest terms rather than by the blades being willing.
+export const DEFAULT_GRASS_WIND_SETTINGS: GrassWindSettings = {
+   directionDegrees: 30,
+   directionVariance: 0.9,
+   bendDegrees: 13.5,
+   breezeStrength: 0,
+   breezeScale: 0.001,
+   breezeSpeed: 0,
+   breezeVariation: 0,
+   flutterStrength: 0.19,
+   flutterSpeed: 6.45,
+   gustStrength: 1.6,
+   gustScale: 0.008,
+   gustSpeed: 14.5,
+   gustFrequency: 1,
+   gustSharpness: 0.13,
+   gustCrest: 1.24,
+   gustRebound: 0.93,
+   gustLobing: 0.27,
+   responseMin: 0.4,
+   responseMax: 0.22,
+   clumpResponse: 0.63,
+}
+
+/**
+ * The two presets are one dial on the tuned default rather than settings in their own right.
+ *
+ * They used to be written as absolute overrides, and they inverted quietly every time the
+ * default was retuned - a "calm" that bent further than the default, a "blustery" with weaker
+ * gusts than it. Twice. Scaling instead means they cannot come out of order however far the
+ * default moves, and they keep its art direction - front size, swirl, stiffness curve, whether
+ * there is a breeze at all - rather than overwriting it with numbers from an older look.
+ *
+ * Amplitudes take the dial directly. Rates and speeds take a softened version of it, because a
+ * calmer day is mostly a smaller wind rather than a slower one, and dropping the speeds as hard
+ * as the strengths reads as slow motion instead of calm.
+ */
+function scaleGrassWindEnergy(settings: GrassWindSettings, energy: number): GrassWindSettings {
+   const eased = Math.pow(energy, 0.6)
+
+   return {
+      ...settings,
+      bendDegrees: settings.bendDegrees * energy,
+      breezeStrength: settings.breezeStrength * energy,
+      breezeSpeed: settings.breezeSpeed * eased,
+      flutterStrength: settings.flutterStrength * eased,
+      flutterSpeed: settings.flutterSpeed * eased,
+      gustStrength: settings.gustStrength * energy,
+      gustSpeed: settings.gustSpeed * eased,
+      // The only one that has a hard ceiling: past 1 the gate stops moving and the dial would
+      // silently do nothing.
+      gustFrequency: Math.min(1, settings.gustFrequency * eased),
+      gustCrest: settings.gustCrest * eased,
+      gustRebound: settings.gustRebound * eased,
+   }
+}
+
+// Barely moving air. Useful as a baseline when tuning: whatever is still moving at this setting
+// is flutter and breeze, and any beat you can see in it is a bug.
+export const CALM_GRASS_WIND_SETTINGS = scaleGrassWindEnergy(DEFAULT_GRASS_WIND_SETTINGS, 0.45)
+
+// Weather. Fronts arrive often enough to overlap, and hard enough to lay the field over.
+export const BLUSTERY_GRASS_WIND_SETTINGS = scaleGrassWindEnergy(DEFAULT_GRASS_WIND_SETTINGS, 1.7)
+
+type GrassWindUniforms = Record<string, { value: number | Vector2 | Vector3 }>
+
+// Declared once and shared by both the blade shader and the debug visualiser, so the two cannot
+// drift apart. uTime and uWindMap live here too - anything that samples wind needs them.
+export const GRASS_WIND_UNIFORMS_GLSL = `
+   uniform float uTime;
+   uniform sampler2D uWindMap;
+   uniform vec2 uWindDirection;
+   // Where the weather has got to, written once a frame by updateGrassWindFlow. These depend on
+   // nothing but the clock, so leaving them in the shader means evaluating five identical sines
+   // at every vertex of every blade in the meadow.
+   //   x - how far the wind has veered across the field, in world units
+   //   y - how far ahead of its steady travel the gust field is running, in world units
+   //   z - the slow drift of the gust gate, which is the wind getting up and dying back down
+   uniform vec3 uWindFlow;
+   uniform float uWindDirectionVariance;
+   uniform float uWindBendDegrees;
+   uniform float uBreezeStrength;
+   uniform float uBreezeScale;
+   uniform float uBreezeSpeed;
+   uniform float uBreezeVariation;
+   uniform float uFlutterStrength;
+   uniform float uFlutterSpeed;
+   uniform float uGustStrength;
+   uniform float uGustScale;
+   uniform float uGustSpeed;
+   uniform float uGustFrequency;
+   uniform float uGustSharpness;
+   uniform float uGustCrest;
+   uniform float uGustRebound;
+   uniform float uGustLobing;
+   uniform float uWindResponseMin;
+   uniform float uWindResponseMax;
+   uniform float uWindClumpResponse;
+`
+
+export const GRASS_WIND_SAMPLE_GLSL = `
+   struct GrassWindSample {
+      // Total bend factor. Goes slightly negative where a blade springs back past upright.
+      float sway;
+      float directionNoise;
+      float breeze;
+      // The gust envelope, 0 between fronts and 1 inside one.
+      float gust;
+      // The leading edge only - non-zero for the moment the wind is picking up here.
+      float crest;
+      // How much of the bend is a front hitting rather than a steady lean, which decides both
+      // the shape the blade takes and how much of its pale underside shows.
+      float whip;
+   };
+
+   GrassWindSample sampleGrassWind(vec2 worldXZ, float bladeHash, float bladeOffset, float clump) {
+      vec2 perp = vec2(-uWindDirection.y, uWindDirection.x);
+      // Two dot products buy the whole model its shape: with U running downwind, advecting the
+      // gust field is a slide along U, and the pre-shifted alpha channel lines up with it.
+      float along = dot(worldXZ, uWindDirection);
+      float across = dot(worldXZ, perp);
+
+      // A blade standing still, sampling a field that slides past it at a fixed speed in a
+      // fixed direction, traces one straight line through the noise forever. It therefore has
+      // its own private climate, and that climate repeats every time the field has moved on by
+      // a tile. Making the field itself lumpier does not help: the line is still a line.
+      //
+      // So the line is bent instead. The wind veers slowly across the meadow, and its speed
+      // surges, and between them the blade traces a wandering curve that never comes back to
+      // itself. Over an hour this is what takes the spread of intervals between gusts at one
+      // spot from plus or minus five per cent of the mean to plus or minus eighty, which is
+      // roughly what real gust arrivals look like.
+      vec4 gustTap = texture2D(
+         uWindMap,
+         vec2(along - uTime * uGustSpeed - uWindFlow.y, across + uWindFlow.x) * uGustScale
+      );
+      float field = gustTap.b;
+      float ahead = gustTap.a;
+      float ragged = gustTap.g;
+
+      // A gust is an event, not a level. Most of the field sits below the gate and stays quiet;
+      // a front is the part of the noise that happens to clear it. Raising uGustFrequency drops
+      // the gate, so fronts get wider and closer together rather than merely stronger.
+      //
+      // The gate wanders too, on periods of five and twelve minutes. That is the difference
+      // between a meadow and a wind tunnel: the wind gets up for a while and then dies back,
+      // and neither the player nor the pattern can anticipate when.
+      float gate = mix(0.86, 0.30, uGustFrequency) + (ragged - 0.5) * uGustLobing + uWindFlow.z;
+      float band = mix(0.32, 0.05, uGustSharpness);
+      float body = smoothstep(gate, gate + band, field);
+
+      // How hard the wind is rising at this blade, from the pre-shifted channel. The two signs
+      // are not the same motion and must not be treated as one: grass goes over fast and comes
+      // back slowly, so the leading edge gets a snap that overshoots the steady bend, and the
+      // trailing edge lets the blade spring back through upright before it settles.
+      //
+      // Which is why the two are gated differently. Gating both by the envelope here would put
+      // the snap where the envelope has barely started and the spring-back where it is still at
+      // full strength - the asymmetry backwards, and measurably so. The snap belongs to the
+      // gust that is arriving, so it is gated by the envelope of the field ahead, and it leads
+      // the bend rather than trailing it. That is the wave you can see coming across a meadow
+      // before it reaches you.
+      float rise = (ahead - field) * 4.0;
+      float crest = max(rise, 0.0) * smoothstep(gate, gate + band, ahead);
+      float rebound = max(-rise, 0.0) * body;
+      float gust = body * uGustStrength + crest * uGustCrest - rebound * uGustRebound;
+
+      vec4 breezeTap = texture2D(uWindMap, vec2(along - uTime * uBreezeSpeed, across) * uBreezeScale);
+      float breezeField = breezeTap.r;
+      float breeze = uBreezeStrength * mix(1.0 - uBreezeVariation, 1.0 + uBreezeVariation, breezeField);
+
+      // Hashing the phase is not enough on its own - blades started at different phases of the
+      // same frequency still visibly share it. Detuning the rate as well is what turns the
+      // field into a shimmer instead of a wave.
+      float detune = fract(bladeHash * 7.31 + bladeOffset * 0.017);
+      float flutterPhase = bladeHash * 6.2831853 + bladeOffset;
+      float flutterRate = uFlutterSpeed * mix(0.68, 1.42, detune);
+      float flutter = sin(uTime * flutterRate + flutterPhase);
+      // A slower second beat against the first, so a blade the camera is close enough to follow
+      // does not read as a metronome on its own either.
+      flutter *= 0.62 + 0.38 * sin(uTime * flutterRate * 0.37 + flutterPhase * 1.7);
+      // Still air does not make grass quiver. The quiver is wind arriving in eddies too small
+      // to bend the blade, so it has to scale with how much wind there is to eddy.
+      float flutterAmount = uFlutterStrength * flutter *
+         (0.55 + 0.75 * clamp(breeze + max(gust, 0.0), 0.0, 1.2)) *
+         mix(0.7, 1.3, breezeTap.g);
+
+      float response = mix(uWindResponseMin, uWindResponseMax, bladeHash) *
+         mix(1.0, uWindClumpResponse, clump);
+
+      GrassWindSample wind;
+      wind.sway = clamp((breeze + gust + flutterAmount) * response, -0.2, 1.5);
+      // Wind veers as it gusts, and a blade caught on the shoulder of a front turns further off
+      // axis than one in the middle of it.
+      wind.directionNoise = (ragged - 0.5) * (0.6 + body * 1.4) +
+         (breezeField - 0.5) * 0.7 +
+         flutter * 0.3;
+      wind.breeze = breeze;
+      wind.gust = body;
+      wind.crest = crest;
+      wind.whip = clamp(crest * 1.9 + body * 0.35, 0.0, 1.0);
+
+      return wind;
+   }
+`
+
+function windDirectionVector(settings: GrassWindSettings, target = new Vector2()) {
+   const radians = (settings.directionDegrees * Math.PI) / 180
+
+   return target.set(Math.cos(radians), Math.sin(radians))
+}
+
+export function createGrassWindUniforms(settings: GrassWindSettings): GrassWindUniforms {
+   return {
+      uWindDirection: { value: windDirectionVector(settings) },
+      uWindFlow: { value: new Vector3() },
+      uWindDirectionVariance: { value: settings.directionVariance },
+      uWindBendDegrees: { value: settings.bendDegrees },
+      uBreezeStrength: { value: settings.breezeStrength },
+      uBreezeScale: { value: settings.breezeScale },
+      uBreezeSpeed: { value: settings.breezeSpeed },
+      uBreezeVariation: { value: settings.breezeVariation },
+      uFlutterStrength: { value: settings.flutterStrength },
+      uFlutterSpeed: { value: settings.flutterSpeed },
+      uGustStrength: { value: settings.gustStrength },
+      uGustScale: { value: settings.gustScale },
+      uGustSpeed: { value: settings.gustSpeed },
+      uGustFrequency: { value: settings.gustFrequency },
+      uGustSharpness: { value: settings.gustSharpness },
+      uGustCrest: { value: settings.gustCrest },
+      uGustRebound: { value: settings.gustRebound },
+      uGustLobing: { value: settings.gustLobing },
+      uWindResponseMin: { value: settings.responseMin },
+      uWindResponseMax: { value: settings.responseMax },
+      uWindClumpResponse: { value: settings.clumpResponse },
+   }
+}
+
+/**
+ * Advances the parts of the wind that are the same everywhere, once per frame.
+ *
+ * All three are slow, and none of them is the wind itself - they are what stops the wind from
+ * repeating. A field sliding past at a fixed speed in a fixed direction hands every blade the
+ * same sequence of gusts over and over; veering it, surging it, and drifting the level at which
+ * a gust counts as a gust are what turn that sequence into weather.
+ */
+export function updateGrassWindFlow(
+   uniforms: Record<string, { value: any }>,
+   elapsed: number,
+   settings: GrassWindSettings
+) {
+   uniforms.uWindFlow.value.set(
+      Math.sin(elapsed * 0.037) * 130 + Math.sin(elapsed * 0.0161 + 2.1) * 85 + Math.sin(elapsed * 0.0071 + 0.6) * 55,
+      // A fraction of the wind speed rather than a fixed distance, so the surge stays in
+      // proportion and fronts can never be driven backwards when the speed is turned down.
+      settings.gustSpeed * (Math.sin(elapsed * 0.029) * 7.8 + Math.sin(elapsed * 0.0117 + 0.7) * 5),
+      Math.sin(elapsed * 0.021) * 0.06 + Math.sin(elapsed * 0.0083 + 1.3) * 0.04
+   )
+}
+
+export function applyGrassWindSettings(uniforms: Record<string, { value: any }>, settings: GrassWindSettings) {
+   // Mutated in place rather than reassigned, because every grass layer holds this same vector
+   // by reference and only sees writes that go through it.
+   windDirectionVector(settings, uniforms.uWindDirection.value)
+   uniforms.uWindDirectionVariance.value = settings.directionVariance
+   uniforms.uWindBendDegrees.value = settings.bendDegrees
+   uniforms.uBreezeStrength.value = settings.breezeStrength
+   uniforms.uBreezeScale.value = settings.breezeScale
+   uniforms.uBreezeSpeed.value = settings.breezeSpeed
+   uniforms.uBreezeVariation.value = settings.breezeVariation
+   uniforms.uFlutterStrength.value = settings.flutterStrength
+   uniforms.uFlutterSpeed.value = settings.flutterSpeed
+   uniforms.uGustStrength.value = settings.gustStrength
+   uniforms.uGustScale.value = settings.gustScale
+   uniforms.uGustSpeed.value = settings.gustSpeed
+   uniforms.uGustFrequency.value = settings.gustFrequency
+   uniforms.uGustSharpness.value = settings.gustSharpness
+   uniforms.uGustCrest.value = settings.gustCrest
+   uniforms.uGustRebound.value = settings.gustRebound
+   uniforms.uGustLobing.value = settings.gustLobing
+   uniforms.uWindResponseMin.value = settings.responseMin
+   uniforms.uWindResponseMax.value = settings.responseMax
+   uniforms.uWindClumpResponse.value = settings.clumpResponse
+}
 
 // Matches the directional light in Environment/Lighting.
 const SUN_DIRECTION = new Vector3(...MOONLIGHT_OFFSET).normalize()
@@ -147,11 +489,6 @@ const glsl = {
    crushAngle: GRASS_CRUSH_ANGLE.toFixed(1),
    bendSquash: GRASS_BEND_SQUASH.toFixed(2),
    crushSquash: GRASS_CRUSH_SQUASH.toFixed(2),
-   swayScale: WIND_SWAY_WORLD_SCALE.toFixed(5),
-   gustScale: WIND_GUST_WORLD_SCALE.toFixed(5),
-   swayScroll: WIND_SWAY_SCROLL.toFixed(5),
-   gustScroll: WIND_GUST_SCROLL.toFixed(5),
-   swayJitter: WIND_SWAY_BLADE_JITTER.toFixed(5),
    fogNear: FOG_NEAR.toFixed(1),
    fogFar: FOG_FAR.toFixed(1),
    innerRamp: FAR_INNER_RAMP.toFixed(1),
@@ -164,17 +501,16 @@ const vertexShader = `
    attribute vec2 aBladeLocalOffset;
    attribute vec4 aBladeMetrics;
 
-   uniform float uTime;
+   ${GRASS_WIND_UNIFORMS_GLSL}
+
    uniform vec2 uPlayerPosition;
    uniform sampler2D uFieldMap;
-   uniform sampler2D uWindMap;
    uniform float uTerrainMinHeight;
    uniform float uTerrainMaxHeight;
    uniform float uTerrainMidHeight;
    uniform vec3 uCameraPosition;
    uniform vec3 uSunDirection;
    uniform vec4 uFrustumPlanes[6];
-   uniform vec2 uWindDirection;
    uniform float uCullRadius;
    uniform float uPatchSize;
    uniform float uPatchHalfSize;
@@ -199,6 +535,8 @@ const vertexShader = `
    #include <common>
    #include <shadowmap_pars_vertex>
 
+   ${GRASS_WIND_SAMPLE_GLSL}
+
    mat3 rotateAroundAxis(vec3 axis, float angle) {
       float s = sin(angle);
       float c = cos(angle);
@@ -206,13 +544,13 @@ const vertexShader = `
 
       return mat3(
          oc * axis.x * axis.x + c,
-         oc * axis.x * axis.y - axis.z * s,
-         oc * axis.z * axis.x + axis.y * s,
          oc * axis.x * axis.y + axis.z * s,
-         oc * axis.y * axis.y + c,
-         oc * axis.y * axis.z - axis.x * s,
          oc * axis.z * axis.x - axis.y * s,
+         oc * axis.x * axis.y - axis.z * s,
+         oc * axis.y * axis.y + c,
          oc * axis.y * axis.z + axis.x * s,
+         oc * axis.z * axis.x + axis.y * s,
+         oc * axis.y * axis.z - axis.x * s,
          oc * axis.z * axis.z + c
       );
    }
@@ -269,7 +607,6 @@ const vertexShader = `
       float terrainHeight = field.r;
       float clump = field.g;
       float lush = field.b;
-      float leanAngle = field.a * 6.2831853;
 
       float spawnFade = smoothstep(0.0, ${glsl.spawnThinRadius}, length(worldXZ));
       float worldY = mix(uTerrainMinHeight, uTerrainMaxHeight, terrainHeight) + 0.22;
@@ -312,33 +649,28 @@ const vertexShader = `
          }
       }
 
-      // Wind is two scrolling taps of a tiling noise texture: fine sway riding on slow gust
-      // fronts that roll coherently across the meadow, in place of eight sin() calls per
-      // vertex. The scroll rates matter more than the amplitudes - the field only reads as
-      // breezy if the pattern actually travels across it at walking pace or better.
-      // Offsetting the sway lookup per blade stops neighbours moving as one rigid sheet while
-      // still leaving them broadly correlated, so the gust fronts survive but the field
-      // shimmers up close.
-      vec2 swayUv = worldXZ * ${glsl.swayScale} - uWindDirection * uTime * ${glsl.swayScroll} +
-         aBladeMetrics.z * ${glsl.swayJitter};
-      vec2 gustUv = worldXZ * ${glsl.gustScale} - uWindDirection * uTime * ${glsl.gustScroll};
-      float sway = texture2D(uWindMap, swayUv).r - 0.5;
-      float gust = smoothstep(0.3, 0.85, texture2D(uWindMap, gustUv).g);
-      float flutter = sin(uTime * 2.6 + aBladeMetrics.z) * 0.32;
+      // A constant breeze, a per-blade flutter, and gust fronts that sweep through on no
+      // schedule at all. Two texture fetches, and no state that has to survive between frames.
+      GrassWindSample wind = sampleGrassWind(worldXZ, bladeHash, aBladeMetrics.z, clump);
 
-      vec2 leanDirection = vec2(cos(leanAngle), sin(leanAngle));
-      float leanStrength = radians(mix(3.0, 15.0, clump));
+      vec2 windPerp = vec2(-uWindDirection.y, uWindDirection.x);
+      float terrainLeanBias = field.a * 2.0 - 1.0;
+      vec2 leanDirection = normalize(
+         uWindDirection * 0.86 +
+            windPerp * terrainLeanBias * 0.18 +
+            vec2(aBladeYaw.x, aBladeYaw.y) * (bladeHash - 0.5) * 0.08
+      );
+      float leanStrength = radians(mix(1.2, 5.6, clump)) *
+         mix(1.0, 0.48, smoothstep(0.1, 0.58, wind.sway));
       // A blade that is already pressed flat has nothing left for the wind to move, which is
       // what stops a fresh trail from shimmering in the breeze like the field around it.
-      float windStrength = radians(29.0) * (sway * 1.6 + gust * 0.9 + flutter) * uWindScale *
+      float windStrength = radians(uWindBendDegrees) * wind.sway * uWindScale *
          (1.0 - 0.8 * max(trampleCrush, trampleBend * 0.6));
-      vec2 windDirection = uWindDirection + vec2(-uWindDirection.y, uWindDirection.x) * sway * 0.8;
+      vec2 windDirection = normalize(uWindDirection + windPerp * wind.directionNoise * uWindDirectionVariance);
 
       // Natural droop and wind used to be two separate axis rotations. Folding them into one
-      // removes a whole matrix build per vertex, but it has to be done as a vector sum: taking
-      // the angle as leanStrength + windStrength flips the blade back the way it came whenever
-      // the sway goes negative, because the direction has already flipped. The magnitude of
-      // the combined vector is the angle, and its normal is the direction.
+      // removes a whole matrix build per vertex, but it has to be done as a vector sum. The
+      // magnitude of the combined vector is the angle, and its normal is the direction.
       vec2 bendVector = windDirection * windStrength + leanDirection * leanStrength;
       float bendAngle = length(bendVector);
       vec2 bendDirection = bendVector / max(bendAngle, 0.0001);
@@ -346,7 +678,11 @@ const vertexShader = `
       // Rotating each vertex by an angle that grows along the blade bends it into an arc
       // rather than tipping it rigidly, which is what gives multi-segment blades a real
       // curved silhouette. A single-segment blade collapses to the old rigid behaviour.
-      float curveT = t * (0.45 + 0.55 * t);
+      // A steady lean bows a blade along its whole length. A front hitting it does something
+      // else: the stem holds and the top half is thrown over. Driving the bend profile with the
+      // gust's leading edge is what makes a wave crossing the meadow read as a different motion
+      // rather than as more of the same one.
+      float curveT = mix(t * (0.45 + 0.55 * t), t * t * (0.25 + 0.75 * t), wind.whip);
       float displacementAmount = max(trampleBend, trampleCrush);
 
       // Wind curls a blade over from the tip down, so it gets a square profile that leaves the
@@ -392,9 +728,11 @@ const vertexShader = `
          // has to be capped: a blade taken much past horizontal folds its tip into the ground.
          float flattenAngle = min(length(flattenVector), radians(${glsl.crushAngle}));
 
+         // The angle used to be negated here, which cancelled the transposed matrix above and
+         // is why trample was the one thing leaning the right way while the wind was not.
          mat3 flatten = rotateAroundAxis(
             normalize(vec3(flattenDirection.y, 0.0, -flattenDirection.x)),
-            -flattenAngle * displacementTip
+            flattenAngle * displacementTip
          );
 
          relativePosition = flatten * relativePosition;
@@ -427,6 +765,11 @@ const vertexShader = `
       color *= mix(0.70, 1.20, wrapDiffuse);
       color += aBladeColor * vec3(0.62, 0.86, 0.34) * backlight * 0.9 * t;
       color += vec3(0.17, 0.19, 0.11) * sheen * t;
+      // Half of what a gust looks like from any distance is a change of colour rather than of
+      // shape: blades thrown past the horizontal turn their pale undersides up, and the front
+      // reads as a light band running across the field. The normal-based sheen above catches
+      // some of this on its own; this is the rest of it.
+      color = mix(color, color * vec3(1.16, 1.2, 1.1) + vec3(0.028, 0.032, 0.024), wind.whip * t * 0.5);
       // Flattened grass sits in its own shadow, and a crushed patch more so than a brushed one.
       color *= mix(1.0, 0.6, (trampleBend * 0.65 + trampleCrush) * displacementTip);
       color *= mix(0.55, 1.0, visibility);
@@ -610,36 +953,131 @@ function tileableValue(x: number, y: number, period: number, seed: number) {
 }
 
 /**
- * Seamlessly tiling wind field. R carries fine sway, G carries the broad gust fronts that roll
- * across the meadow. Two texture fetches replace the eight sin() calls the old per-blade wind
- * cost every vertex, and coherent weather reads far better than independent blade wobble.
+ * Flattens a channel's histogram, in place of using it as it falls out of the noise.
+ *
+ * Value noise is clustered hard around its mean - interpolating random corners throws most of
+ * the range away, and summing octaves narrows it further - so a threshold applied to it raw
+ * lands somewhere unpredictable on a very steep part of the distribution. Cutting the gust
+ * field at 0.64 sounds like it should leave a third of the meadow gusting; against the raw
+ * field it left none of it.
+ *
+ * The remap is monotonic, so every level set keeps its shape and the field stays as smooth as
+ * it was - a front is still the same outline, it is just now reachable. What it buys is that
+ * the gate means exactly what it says whatever the octave weights are: a gate of 0.7 puts
+ * thirty percent of the field inside a gust. It also stretches the tails, and that is where the
+ * hard edge of a front comes from.
  */
-function createWindTexture() {
-   const pixels = new Uint8Array(WIND_MAP_SIZE * WIND_MAP_SIZE * 4)
+// A counting sort over quantised buckets rather than a real one. The result is written to eight
+// bits, so resolving the distribution finer than this cannot change a texel, and this is linear
+// where sorting sixty-five thousand indices per channel is seventy-five milliseconds of startup.
+const HISTOGRAM_BUCKETS = 4096
+
+function flattenHistogram(values: Float32Array) {
+   let min = Infinity
+   let max = -Infinity
+
+   for (let index = 0; index < values.length; index++) {
+      min = Math.min(min, values[index])
+      max = Math.max(max, values[index])
+   }
+
+   const scale = max > min ? (HISTOGRAM_BUCKETS - 1) / (max - min) : 0
+   const buckets = new Uint16Array(values.length)
+   const ranks = new Float32Array(HISTOGRAM_BUCKETS)
+
+   for (let index = 0; index < values.length; index++) {
+      const bucket = Math.round((values[index] - min) * scale)
+
+      buckets[index] = bucket
+      ranks[bucket]++
+   }
+
+   // Every value in a bucket maps to that bucket's mid rank, so the remap stays centred rather
+   // than pinning one end of the range to the count below it.
+   let below = 0
+
+   for (let bucket = 0; bucket < HISTOGRAM_BUCKETS; bucket++) {
+      const held = ranks[bucket]
+
+      ranks[bucket] = (below + held * 0.5) / values.length
+      below += held
+   }
+
+   const flattened = new Float32Array(values.length)
+
+   for (let index = 0; index < values.length; index++) {
+      flattened[index] = ranks[buckets[index]]
+   }
+
+   return flattened
+}
+
+/**
+ * Seamlessly tiling wind field, four channels that are read at two very different scales.
+ *
+ *   R - broad fbm. Read at breeze scale, where it is the breeze itself.
+ *   G - mid detail. Read at gust scale it breaks the fronts up into lobes so they do not cross
+ *       the meadow as straight lines; read at breeze scale it varies flutter across the field.
+ *   B - the gust field. Deliberately only two octaves: the shader makes fronts out of this by
+ *       cutting it at a level, and every extra octave punches holes in them.
+ *   A - B again, shifted GUST_LEAD_TEXELS upwind. Because wind is sampled in wind space, that
+ *       is "the gust field as it will be here shortly" for any wind direction, and it comes
+ *       back in the fetch that was already being made.
+ */
+export function createWindTexture() {
+   const texelCount = WIND_MAP_SIZE * WIND_MAP_SIZE
+   const pixels = new Uint8Array(texelCount * 4)
+   const rawBreeze = new Float32Array(texelCount)
+   const rawDetail = new Float32Array(texelCount)
+   const rawGust = new Float32Array(texelCount)
 
    for (let y = 0; y < WIND_MAP_SIZE; y++) {
       for (let x = 0; x < WIND_MAP_SIZE; x++) {
          const u = x / WIND_MAP_SIZE
          const v = y / WIND_MAP_SIZE
-         let sway = 0
-         let swayNormalisation = 0
+         const index = y * WIND_MAP_SIZE + x
+         let breeze = 0
          let amplitude = 1
 
          for (let octave = 0; octave < 4; octave++) {
             const period = 4 * Math.pow(2, octave)
 
-            sway += tileableValue(u * period, v * period, period, octave * 37) * amplitude
-            swayNormalisation += amplitude
+            breeze += tileableValue(u * period, v * period, period, octave * 37) * amplitude
             amplitude *= 0.5
          }
 
-         const gust = tileableValue(u * 3, v * 3, 3, 91) * 0.7 + tileableValue(u * 6, v * 6, 6, 17) * 0.3
-         const pixelIndex = (y * WIND_MAP_SIZE + x) * 4
+         rawBreeze[index] = breeze
+         rawDetail[index] = tileableValue(u * 8, v * 8, 8, 307) * 0.66 + tileableValue(u * 16, v * 16, 16, 419) * 0.34
+         // Three octaves from a period-1 base. Two octaves from a period-2 base is smoother,
+         // and it was the first thing tried, but it gives the field one dominant cell size -
+         // and a field with one cell size, slid past a standing blade at a steady speed, delivers
+         // a gust every thirty seconds to the second. The low base is what puts several fronts
+         // of unrelated widths on any given lane.
+         rawGust[index] =
+            tileableValue(u, v, 1, 91) * 0.4 +
+            tileableValue(u * 2, v * 2, 2, 17) * 0.34 +
+            tileableValue(u * 3, v * 3, 3, 143) * 0.26
+      }
+   }
 
-         pixels[pixelIndex] = Math.round((sway / swayNormalisation) * 255)
-         pixels[pixelIndex + 1] = Math.round(gust * 255)
-         pixels[pixelIndex + 2] = 0
-         pixels[pixelIndex + 3] = 255
+   const breeze = flattenHistogram(rawBreeze)
+   const detail = flattenHistogram(rawDetail)
+   // Flattened before the shifted copy is taken, so both channels carry the same field and
+   // their difference is a real gradient rather than two different remappings of one.
+   const gust = flattenHistogram(rawGust)
+
+   for (let y = 0; y < WIND_MAP_SIZE; y++) {
+      for (let x = 0; x < WIND_MAP_SIZE; x++) {
+         const index = y * WIND_MAP_SIZE + x
+         const pixelIndex = index * 4
+         // The whole field is periodic over the texture, so wrapping the lookup is exact rather
+         // than a seam that happens to be hidden.
+         const leadX = (x - GUST_LEAD_TEXELS + WIND_MAP_SIZE) % WIND_MAP_SIZE
+
+         pixels[pixelIndex] = Math.round(breeze[index] * 255)
+         pixels[pixelIndex + 1] = Math.round(detail[index] * 255)
+         pixels[pixelIndex + 2] = Math.round(gust[index] * 255)
+         pixels[pixelIndex + 3] = Math.round(gust[y * WIND_MAP_SIZE + leadX] * 255)
       }
    }
 
@@ -899,7 +1337,11 @@ const GrassLayer: React.FC<GrassLayerProps> = ({
    )
 }
 
-const Grass: React.FC = () => {
+interface GrassProps {
+   windSettings?: GrassWindSettings
+}
+
+const Grass: React.FC<GrassProps> = ({ windSettings = DEFAULT_GRASS_WIND_SETTINGS }) => {
    const [quality] = useState(detectQualityProfile)
    const totalLayers = quality.nearChunks + quality.farChunks
    const [visibleLayerCount, setVisibleLayerCount] = useState(0)
@@ -952,13 +1394,13 @@ const Grass: React.FC = () => {
          uPlayerPosition: { value: playerPosition },
          uFieldMap: { value: fieldMap.texture },
          uWindMap: { value: windMap },
+         ...createGrassWindUniforms(windSettings),
          uTerrainMinHeight: { value: fieldMap.minHeight },
          uTerrainMaxHeight: { value: fieldMap.maxHeight },
          uTerrainMidHeight: { value: (fieldMap.minHeight + fieldMap.maxHeight) / 2 },
          uCameraPosition: { value: cameraPosition },
          uSunDirection: { value: SUN_DIRECTION },
          uFrustumPlanes: { value: frustumPlanes },
-         uWindDirection: { value: new Vector2(0.72, 0.42).normalize() },
          uFogColor: { value: GRASS_FOG_COLOR },
          // Half the terrain relief plus the tallest a blade can stand and sway, so the cull
          // sphere never rejects a blade that should still be on screen.
@@ -969,7 +1411,7 @@ const Grass: React.FC = () => {
          uTrampleMap: { value: trampleField.texture() },
          uTrampleWindow: { value: trampleField.window },
       }
-   }, [cameraPosition, fieldMap, frustumPlanes, playerPosition, trampleField, windMap])
+   }, [cameraPosition, fieldMap, frustumPlanes, playerPosition, trampleField, windMap, windSettings])
 
    useEffect(() => {
       const cleanups = Array.from({ length: totalLayers }, (_, index) =>
@@ -1002,6 +1444,8 @@ const Grass: React.FC = () => {
       const elapsed = state.clock.elapsedTime
       playerPosition.set(localX, localZ)
       cameraPosition.copy(state.camera.position)
+      applyGrassWindSettings(sharedUniforms, windSettings)
+      updateGrassWindFlow(sharedUniforms, elapsed, windSettings)
 
       frustumMatrix.multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse)
       frustum.setFromProjectionMatrix(frustumMatrix)
