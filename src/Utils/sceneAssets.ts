@@ -2,6 +2,7 @@ import { LoadingManager } from 'three'
 import { FBXLoader, GLTFLoader } from 'three-stdlib'
 import { createAssetBatch } from './createAssetBatch.js'
 import { sceneAssetUrls } from './sceneAssetManifest.js'
+import { consolidateMaterialGroups } from './consolidateMaterialGroups.js'
 
 function loadSceneAsset(url: string) {
    return new Promise((resolve, reject) => {
@@ -14,7 +15,7 @@ function loadSceneAsset(url: string) {
       loader.load(
          url,
          (asset) => {
-            result = asset
+            result = url.endsWith('.fbx') ? consolidateMaterialGroups(asset) : asset
          },
          undefined,
          reject
