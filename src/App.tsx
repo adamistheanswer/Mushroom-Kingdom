@@ -6,7 +6,7 @@ import Ground from './Environment/Ground'
 import Grass, { DEFAULT_GRASS_WIND_SETTINGS } from './Environment/Grass'
 import GrassWindVisualizer from './Environment/GrassWindVisualizer'
 import Forest from './Environment/Forest'
-import BoundaryWalls from './Environment/BoundaryWalls'
+import BoundaryTerrain from './Environment/BoundaryTerrain'
 import Sky from './Environment/Sky'
 import { synchronizeWorldTime } from './Environment/dayNightState'
 import Loader from './Components/Loader'
@@ -337,7 +337,7 @@ const App: React.FC = () => {
                      />
                   )}
                   <Forest />
-                  <BoundaryWalls />
+                  <BoundaryTerrain />
                </SceneAssets>
             </Suspense>
          </Canvas>
