@@ -5,7 +5,7 @@
    "type": "module",
    "scripts": {
       "build": "vite build",
-      "dev": "cross-env NODE_ENV=development nodemon --watch server --watch server.js --watch vite.config.js --ext js,json --exec node server.js",
+      "dev": "cross-env NODE_ENV=development nodemon --watch server --watch shared --watch server.js --watch vite.config.js --ext js,json --exec node server.js",
       "start": "node server.js",
       "preview": "npm run build && npm run start",
       "format": "prettier --write \"src/**/*.{js,jsx,json,md,ts,tsx,css}\" \"server/**/*.js\" \"*.{js,json,md}\""

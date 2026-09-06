@@ -8,6 +8,7 @@ import GrassWindVisualizer from './Environment/GrassWindVisualizer'
 import Forest from './Environment/Forest'
 import BoundaryWalls from './Environment/BoundaryWalls'
 import Sky from './Environment/Sky'
+import { synchronizeWorldTime } from './Environment/dayNightState'
 import Loader from './Components/Loader'
 import GrassWindDebugPanel from './Components/GrassWindDebugPanel'
 import RemotePlayers from './Players/RemotePlayers'
@@ -32,10 +33,7 @@ import DebugOverlay, {
    instrumentSocketSend,
    SceneDebugSampler,
 } from './Components/DebugOverlay'
-import {
-   decodeClientMetadataUpdateBatch,
-   decodeClientMotionUpdateBatch,
-} from '../shared/clientUpdateProtocol.js'
+import { decodeClientMetadataUpdateBatch, decodeClientMotionUpdateBatch } from '../shared/clientUpdateProtocol.js'
 
 const canvasGlOptions = { powerPreference: 'high-performance' } as const
 const DEBUG_TOOLS_ENABLED = import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug')
@@ -134,7 +132,7 @@ const App: React.FC = () => {
 
       const sendHeartbeat = (nextSocket: WebSocket) => {
          if (nextSocket.readyState === WebSocket.OPEN && nextSocket.bufferedAmount < 64 * 1024) {
-            nextSocket.send(encode({ type: 'heartbeat', payload: Date.now() }))
+            nextSocket.send(encode({ type: 'heartbeat', payload: performance.now() }))
          }
       }
 
@@ -178,6 +176,8 @@ const App: React.FC = () => {
             if (message.type === 'largeScenery') {
                setLargeScenery(message.payload)
             }
+
+            if (message.type === 'worldTime') synchronizeWorldTime(message.payload)
 
             if (message.type === 'smallScenery') {
                setSmallScenery(message.payload)

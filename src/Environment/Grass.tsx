@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { environment } from './dayNightState'
 import {
    BufferAttribute,
    ClampToEdgeWrapping,
@@ -21,9 +22,9 @@ import {
    Vector3,
    Vector4,
 } from 'three'
-import { MOONLIGHT_OFFSET, WORLD_HALF_SIZE } from '../constants'
+import { WORLD_HALF_SIZE } from '../constants'
 import { isHandheldDevice } from '../Utils/isHandheldDevice'
-import { FOG_FAR, FOG_NEAR, SCENE_FOG_COLOR } from './sceneQuality'
+import { FOG_FAR, FOG_NEAR } from './sceneQuality'
 import { usePlayerPositionsStore } from '../State/playerPositionsStore'
 import { createTerrainNoise, fbm, getTerrainHeightAtWorld } from './terrain'
 import { createTrampleField } from './TrampleField'
@@ -56,7 +57,6 @@ const GRASS_BEND_SQUASH = 0.58
 const GRASS_CRUSH_SQUASH = 0.34
 
 const WIND_MAP_SIZE = 256
-
 
 const GUST_LEAD_TEXELS = 10
 
@@ -408,21 +408,6 @@ export function applyGrassWindSettings(uniforms: Record<string, { value: any }>,
    uniforms.uWindClumpResponse.value = settings.clumpResponse
 }
 
-// Matches the directional light in Environment/Lighting.
-const SUN_DIRECTION = new Vector3(...MOONLIGHT_OFFSET).normalize()
-const GRASS_FOG_COLOR = hexColorToShaderVector(SCENE_FOG_COLOR)
-
-function hexColorToShaderVector(hexColor: string) {
-   const hex = hexColor.replace('#', '')
-   const value = Number.parseInt(hex, 16)
-
-   return new Vector3(
-      ((value >> 16) & 255) / 255,
-      ((value >> 8) & 255) / 255,
-      (value & 255) / 255
-   )
-}
-
 interface QualityProfile {
    nearBlades: number
    nearChunks: number
@@ -510,6 +495,7 @@ const vertexShader = `
    uniform float uTerrainMidHeight;
    uniform vec3 uCameraPosition;
    uniform vec3 uSunDirection;
+   uniform vec3 uDirectStrength;
    uniform vec4 uFrustumPlanes[6];
    uniform float uCullRadius;
    uniform float uPatchSize;
@@ -762,9 +748,9 @@ const vertexShader = `
 
       vec3 color = aBladeColor * mix(vec3(0.34, 0.40, 0.31), vec3(0.80, 0.90, 0.63), t);
       color *= mix(vec3(0.86, 0.92, 0.80), vec3(1.10, 1.06, 0.86), clump);
-      color *= mix(0.70, 1.20, wrapDiffuse);
-      color += aBladeColor * vec3(0.62, 0.86, 0.34) * backlight * 0.9 * t;
-      color += vec3(0.17, 0.19, 0.11) * sheen * t;
+      color *= mix(0.95, mix(0.70, 1.20, wrapDiffuse), uDirectStrength.x);
+      color += aBladeColor * vec3(0.62, 0.86, 0.34) * backlight * 0.9 * t * uDirectStrength.x;
+      color += vec3(0.17, 0.19, 0.11) * sheen * t * uDirectStrength.x;
       // Half of what a gust looks like from any distance is a change of colour rather than of
       // shape: blades thrown past the horizontal turn their pale undersides up, and the front
       // reads as a light band running across the field. The normal-based sheen above catches
@@ -794,6 +780,7 @@ const vertexShader = `
 
 const fragmentShader = `
    uniform vec3 uFogColor;
+   uniform vec3 uDayTint;
    uniform bool receiveShadow;
 
    varying vec3 vColor;
@@ -807,7 +794,7 @@ const fragmentShader = `
 
    void main() {
       float shadowMask = getShadowMask();
-      vec3 shadowedColor = vColor * mix(0.68, 1.0, shadowMask);
+      vec3 shadowedColor = vColor * uDayTint * mix(0.68, 1.0, shadowMask);
 
       #ifdef OPAQUE_GRASS
          // A stable per-blade hash rather than a screen-space dither: blades in the fade band
@@ -1399,9 +1386,11 @@ const Grass: React.FC<GrassProps> = ({ windSettings = DEFAULT_GRASS_WIND_SETTING
          uTerrainMaxHeight: { value: fieldMap.maxHeight },
          uTerrainMidHeight: { value: (fieldMap.minHeight + fieldMap.maxHeight) / 2 },
          uCameraPosition: { value: cameraPosition },
-         uSunDirection: { value: SUN_DIRECTION },
+         uSunDirection: { value: environment.primaryDirection },
+         uDirectStrength: { value: environment.directUniform },
          uFrustumPlanes: { value: frustumPlanes },
-         uFogColor: { value: GRASS_FOG_COLOR },
+         uFogColor: { value: environment.grassFog },
+         uDayTint: { value: environment.grassTint },
          // Half the terrain relief plus the tallest a blade can stand and sway, so the cull
          // sphere never rejects a blade that should still be on screen.
          uCullRadius: { value: (fieldMap.maxHeight - fieldMap.minHeight) / 2 + 12 },

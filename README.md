@@ -71,3 +71,17 @@ Suggestions for improving the server and WebSocket flow would be much appreciate
 ## 3D Assets
 
 [Nature Pack](https://quaternius.com/)
+# World time
+
+The server supplies world time on join and on each 25-second heartbeat. Clients compensate
+for half the round-trip delay and advance using a monotonic browser clock, so local clock
+settings do not change the time of day. Reconnecting resynchronizes automatically.
+
+`shared/dayNightCycle.js` defines a repeating 10-minute cycle: five minutes from sunrise to
+sunset and five from sunset to sunrise. Dawn, dusk and blue twilight blend across each
+horizon crossing (roughly 45 seconds), within those ten minutes. A fixed UTC epoch keeps
+the cycle running through empty rooms and server restarts. The sun and moon peak at 25°
+and travel across the negative-Z side of the sky; their directions also drive the key
+light, moving shadows and grass highlights. Night retains the cool forest palette.
+
+Run `node --test shared/dayNightCycle.test.js` to check timing, paths and server messages.

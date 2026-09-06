@@ -3,6 +3,7 @@ import { clearClientMovementQueue } from '../clients/clientMessages.js'
 import { getAllClients, getClientCount, removeClient, setClient } from '../clients/clientState.js'
 import { broadcastClientDisconnect, markClientUpdated } from '../clients/clientUpdates.js'
 import { uid } from '../utils/uid.js'
+import { getWorldTime } from '../world/dayNightCycle.js'
 import { clearWorld, ensureWorldGenerated, getLargeScenery, getSmallScenery } from '../world/world.js'
 import { routeClientMessage } from './messageRouter.js'
 import { encodeMessage, sendEncoded, sendMessage } from './messages.js'
@@ -49,6 +50,7 @@ function sendJoinSnapshot(socket, clientId) {
    const sceneryFrames = getEncodedSceneryFrames()
 
    sendMessage(socket, 'clientId', clientId)
+   sendMessage(socket, 'worldTime', getWorldTime())
    sendMessage(socket, 'activeClients', getAllClients())
    sendEncoded(socket, sceneryFrames.largeFrame)
    sendEncoded(socket, sceneryFrames.smallFrame)
