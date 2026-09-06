@@ -1,4 +1,4 @@
-import { Color, Vector3 } from 'three'
+import { Color, Vector2, Vector3 } from 'three'
 import { getDayNightState } from '../../shared/dayNightCycle.js'
 
 let anchorTime = 0
@@ -31,12 +31,17 @@ export const environment = {
    grassTint: new Color(),
    grassFog: new Color(),
    directUniform: new Vector3(),
+   cloudDrift: new Vector2(),
 }
 
 export function updateEnvironment() {
    // Keep the original night mood until the server supplies the clock.
    const time = synchronized ? anchorTime + performance.now() - anchorLocal : 450000
    Object.assign(environment, getDayNightState(time))
+   // A seamless one-hour drift uses server time, so joining players see the same clouds.
+   // Bound the shader coordinates to preserve floating-point detail after long server uptimes.
+   const cloudAngle = ((time % 3600000) / 3600000) * Math.PI * 2
+   environment.cloudDrift.set(Math.cos(cloudAngle) * 6, Math.sin(cloudAngle) * 6)
    const { daylight, twilight, primaryIsSun, sunDirection, moonDirection } = environment
    environment.primaryDirection.fromArray(primaryIsSun ? sunDirection : moonDirection)
    environment.zenith.copy(night).lerp(day, daylight)

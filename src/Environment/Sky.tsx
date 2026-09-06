@@ -13,6 +13,7 @@ import {
    Vector3,
 } from 'three'
 import { environment } from './dayNightState'
+import Clouds from './Clouds'
 
 // The sky rides along with the camera, so these are distances from the viewer rather than world
 // positions. Everything stays well inside the camera's 2000 unit far plane.
@@ -357,6 +358,7 @@ export default function Sky() {
          <Stars />
          <Moon />
          <Moon sun />
+         <Clouds />
       </group>
    )
 }

@@ -10,6 +10,7 @@ import BoundaryWalls from './Environment/BoundaryWalls'
 import Sky from './Environment/Sky'
 import { synchronizeWorldTime } from './Environment/dayNightState'
 import Loader from './Components/Loader'
+import SceneAssets from './Components/SceneAssets'
 import GrassWindDebugPanel from './Components/GrassWindDebugPanel'
 import RemotePlayers from './Players/RemotePlayers'
 import LocalPlayer from './Players/LocalPlayer'
@@ -321,28 +322,30 @@ const App: React.FC = () => {
             <Lighting />
             <Sky />
             <Suspense fallback={<Loader />}>
-               <SceneReadySignal onReady={handleSceneReady} />
-               {socket && <RemotePlayers />}
-               {socket && <LocalPlayer clientSocket={socket} showSpawnEffect={localSpawnEffectReady} />}
-               <Ground />
-               <Grass windSettings={grassWindSettings} />
-               {GRASS_WIND_TUNING_ENABLED && grassWindVisualizerEnabled && (
-                  <GrassWindVisualizer
-                     settings={grassWindSettings}
-                     height={grassWindVisualizerHeight}
-                     opacity={grassWindVisualizerOpacity}
-                     size={grassWindVisualizerSize}
-                  />
-               )}
-               <Forest />
-               <BoundaryWalls />
+               <SceneAssets>
+                  <SceneReadySignal onReady={handleSceneReady} />
+                  {socket && <RemotePlayers />}
+                  {socket && <LocalPlayer clientSocket={socket} showSpawnEffect={localSpawnEffectReady} />}
+                  <Ground />
+                  <Grass windSettings={grassWindSettings} />
+                  {GRASS_WIND_TUNING_ENABLED && grassWindVisualizerEnabled && (
+                     <GrassWindVisualizer
+                        settings={grassWindSettings}
+                        height={grassWindVisualizerHeight}
+                        opacity={grassWindVisualizerOpacity}
+                        size={grassWindVisualizerSize}
+                     />
+                  )}
+                  <Forest />
+                  <BoundaryWalls />
+               </SceneAssets>
             </Suspense>
          </Canvas>
 
          {/* Every on-screen control sits in the HUD layer so it tracks the visual
              viewport together and stays reachable while the keyboard is up. */}
          <div className="mk-hud">
-            {socket && <OverlayUIWrapper socket={socket} />}
+            {socket && sceneReady && <OverlayUIWrapper socket={socket} />}
             {socket && <MobileJoystick />}
          </div>
 

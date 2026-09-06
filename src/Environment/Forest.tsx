@@ -1,43 +1,13 @@
 import React, { useLayoutEffect, useMemo, useRef } from 'react'
 import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three'
-import { useFBX } from '@react-three/drei'
+import { modelUrlMap } from '../Utils/sceneAssetManifest.js'
+import { readSceneAsset } from '../Utils/sceneAssets'
 import useSceneryStore from '../State/SceneryStore'
-
-const modelUrlMap = {
-   0: '../Models/Forest/BirchTree_1.fbx',
-   1: '../Models/Forest/BirchTree_2.fbx',
-   2: '../Models/Forest/BirchTree_3.fbx',
-   3: '../Models/Forest/BirchTree_4.fbx',
-   4: '../Models/Forest/CommonTree_1.fbx',
-   5: '../Models/Forest/CommonTree_2.fbx',
-   6: '../Models/Forest/CommonTree_3.fbx',
-   7: '../Models/Forest/CommonTree_4.fbx',
-   8: '../Models/Forest/CommonTree_5.fbx',
-   9: '../Models/Forest/Plant_1.fbx',
-   10: '../Models/Forest/WoodLog.fbx',
-   11: '../Models/Forest/TreeStump_Moss.fbx',
-   12: '../Models/Forest/TreeStump.fbx',
-   13: '../Models/Forest/Plant_2.fbx',
-   14: '../Models/Forest/Plant_3.fbx',
-   15: '../Models/Forest/Plant_4.fbx',
-   16: '../Models/Forest/Rock_5.fbx',
-   17: '../Models/Forest/Rock_7.fbx',
-   18: '../Models/Forest/Grass_2.fbx',
-   19: '../Models/Forest/Grass_Short.fbx',
-   20: '../Models/Forest/Grass.fbx',
-   21: '../Models/Forest/Flowers.fbx',
-   22: '../Models/Forest/Grass_2.fbx',
-   23: '../Models/Forest/Grass_Short.fbx',
-   24: '../Models/Forest/Grass.fbx',
-   25: '../Models/Forest/Flowers.fbx',
-   26: '../Models/Forest/Plant_2.fbx',
-   27: '../Models/Forest/Plant_3.fbx',
-}
 
 const Y_AXIS = new Vector3(0, 1, 0)
 
 function seededUnit(seed: number) {
-   return Math.sin(seed * 127.1) * 43758.5453123 % 1
+   return (Math.sin(seed * 127.1) * 43758.5453123) % 1
 }
 
 function randomUnit(seed: number) {
@@ -144,8 +114,7 @@ const SceneryInstances = ({ geometry, material, localMatrix, entities, castsShad
 }
 
 const SceneryModelGroup = ({ modelUrl, entities }) => {
-   const model = useFBX(modelUrl)
-
+   const model = readSceneAsset(modelUrl)
 
    const parts = useMemo(() => {
       model.updateMatrixWorld(true)

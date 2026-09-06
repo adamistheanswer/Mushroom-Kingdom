@@ -1,4 +1,3 @@
-import { useLoadingProgress } from '../Utils/useLoadingProgress'
 import React from 'react'
 import UserNameForm from './UserNameForm'
 import PopoutMenu from './PopoutMenu'
@@ -9,17 +8,11 @@ interface UserNameFormProps {
 }
 
 const OverlayUIWrapper: React.FC<UserNameFormProps> = ({ socket }) => {
-   const { loaded } = useLoadingProgress()
-
    return (
       <>
-         {loaded >= 25 && (
-            <>
-               <UserNameForm socket={socket} />
-               <PopoutMenu socket={socket} />
-               <ChatPanel socket={socket} />
-            </>
-         )}
+         <UserNameForm socket={socket} />
+         <PopoutMenu socket={socket} />
+         <ChatPanel socket={socket} />
       </>
    )
 }
