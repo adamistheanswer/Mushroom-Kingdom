@@ -188,14 +188,15 @@ function getCurrentAssetName(item?: string) {
 }
 
 export default function Loader() {
-   const { active, errors, item, loaded, progress, total } = useLoadingProgress()
-   const isComplete = !active || (total > 0 && loaded >= total)
+   const { errors, item, loaded, progress, total } = useLoadingProgress()
+   const isComplete = total > 0 && loaded === total && errors.length === 0
    const barProgress = isComplete ? 100 : Math.max(0, Math.min(99.9, progress || 0))
    const displayedProgress = isComplete ? 100 : Math.max(0, Math.min(99, Math.floor(progress || 0)))
    const phaseIndex = Math.min(loadingPhases.length - 1, Math.floor((barProgress / 100) * loadingPhases.length))
-   const phase = active ? loadingPhases[phaseIndex] : 'Forest ready'
-   const assetCount = total > 0 ? `${loaded}/${total} assets` : `${loaded} assets`
-   const currentItem = active ? getCurrentAssetName(item) : 'Scene loaded'
+   const phase =
+      errors.length > 0 ? 'Unable to finish loading' : isComplete ? 'Preparing scene' : loadingPhases[phaseIndex]
+   const assetCount = `${loaded}/${total} models`
+   const currentItem = isComplete ? 'Preparing scene' : getCurrentAssetName(item)
 
    return (
       <Html fullscreen>
@@ -235,7 +236,7 @@ export default function Loader() {
                   <CurrentItem title={currentItem}>{currentItem}</CurrentItem>
                   {errors.length > 0 && (
                      <ErrorText>
-                        {errors.length} asset issue{errors.length === 1 ? '' : 's'} detected
+                        {errors.length} model{errors.length === 1 ? '' : 's'} failed to load. Please reload to retry.
                      </ErrorText>
                   )}
                </LoadingText>

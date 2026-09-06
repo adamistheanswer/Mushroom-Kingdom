@@ -7,11 +7,13 @@ import {
    Color,
    Float32BufferAttribute,
    Group,
+   Mesh,
    Object3D,
    ShaderMaterial,
    Vector3,
 } from 'three'
-import { MOONLIGHT_OFFSET } from '../constants'
+import { environment } from './dayNightState'
+import Clouds from './Clouds'
 
 // The sky rides along with the camera, so these are distances from the viewer rather than world
 // positions. Everything stays well inside the camera's 2000 unit far plane.
@@ -27,7 +29,7 @@ const STAR_MIN_Y = -0.05
 // Drawn before everything else so the world always sits in front of the sky.
 const SKY_RENDER_ORDER = -1000
 
-const MOON_DIRECTION = new Vector3(...MOONLIGHT_OFFSET).normalize()
+const MOON_DIRECTION = new Vector3().fromArray(environment.moonDirection)
 
 const domeVertexShader = `
    varying vec3 vDirection;
@@ -86,6 +88,7 @@ const starVertexShader = `
 `
 
 const starFragmentShader = `
+   uniform float uVisibility;
    varying vec3 vColor;
    varying float vTwinkle;
 
@@ -93,7 +96,7 @@ const starFragmentShader = `
       float distanceFromCenter = length(gl_PointCoord - 0.5) * 2.0;
       float core = smoothstep(1.0, 0.0, distanceFromCenter);
       float halo = pow(max(1.0 - distanceFromCenter, 0.0), 3.0);
-      float alpha = (core * 0.85 + halo * 0.35) * vTwinkle;
+      float alpha = (core * 0.85 + halo * 0.35) * vTwinkle * uVisibility;
 
       if (alpha < 0.01) discard;
 
@@ -111,6 +114,8 @@ const moonVertexShader = `
 `
 
 const moonFragmentShader = `
+   uniform float uVisibility;
+   uniform float uIsSun;
    uniform vec3 uSurfaceColor;
    uniform vec3 uMariaColor;
    uniform vec3 uGlowColor;
@@ -135,7 +140,7 @@ const moonFragmentShader = `
       maria += mare(p, vec2(0.09, -0.04), 0.070, 0.30) * 0.7;
       maria += mare(p, vec2(-0.04, -0.10), 0.045, 0.25) * 0.6;
       maria += mare(p, vec2(-0.12, -0.03), 0.035, 0.30) * 0.5;
-      maria = clamp(maria, 0.0, 1.0);
+      maria = clamp(maria, 0.0, 1.0) * (1.0 - uIsSun);
 
       vec3 surface = mix(uSurfaceColor, uMariaColor, maria * 0.55);
 
@@ -154,7 +159,7 @@ const moonFragmentShader = `
       // alpha stays at one. Folding it into both would square the halo and choke it off.
       if (max(color.r, max(color.g, color.b)) < 0.004) discard;
 
-      gl_FragColor = vec4(color, 1.0);
+      gl_FragColor = vec4(color, uVisibility);
    }
 `
 
@@ -214,6 +219,7 @@ const Stars = () => {
    const uniforms = useMemo(
       () => ({
          uTime: { value: 0 },
+         uVisibility: { value: 1 },
          uPixelScale: { value: 1 },
       }),
       []
@@ -228,6 +234,7 @@ const Stars = () => {
    useFrame(({ clock }) => {
       if (materialRef.current) {
          materialRef.current.uniforms.uTime.value = clock.elapsedTime
+         materialRef.current.uniforms.uVisibility.value = Math.pow(1 - environment.daylight, 2)
       }
    })
 
@@ -246,8 +253,10 @@ const Stars = () => {
    )
 }
 
-const Moon = () => {
-   // The sky group is centred on the camera, so the moon's facing never changes once set.
+const Moon = ({ sun = false }: { sun?: boolean }) => {
+   const meshRef = useRef<Mesh>(null!)
+   const orienterRef = useMemo(() => new Object3D(), [])
+   // Initial orientation; the billboard turns towards the viewer as it crosses the sky.
    const { position, quaternion } = useMemo(() => {
       const moonPosition = MOON_DIRECTION.clone().multiplyScalar(MOON_DISTANCE)
       const orienter = new Object3D()
@@ -258,15 +267,35 @@ const Moon = () => {
 
    const uniforms = useMemo(
       () => ({
-         uSurfaceColor: { value: new Color('#eef3ff') },
+         uSurfaceColor: { value: new Color(sun ? '#fff2bf' : '#eef3ff') },
          uMariaColor: { value: new Color('#9fb0cc') },
-         uGlowColor: { value: new Color('#7ea3d8') },
+         uGlowColor: { value: new Color(sun ? '#ffb652' : '#7ea3d8') },
+         uVisibility: { value: 1 },
+         uIsSun: { value: sun ? 1 : 0 },
       }),
-      []
+      [sun]
    )
 
+   useFrame(() => {
+      const mesh = meshRef.current
+      if (!mesh) return
+      mesh.position.fromArray(sun ? environment.sunDirection : environment.moonDirection).multiplyScalar(MOON_DISTANCE)
+      orienterRef.position.copy(mesh.position)
+      orienterRef.lookAt(0, 0, 0)
+      mesh.quaternion.copy(orienterRef.quaternion)
+      const visibility = sun ? environment.sunVisibility : environment.moonVisibility
+      ;(mesh.material as ShaderMaterial).uniforms.uVisibility.value = visibility
+      mesh.visible = visibility > 0.001
+   })
+
    return (
-      <mesh position={position} quaternion={quaternion} renderOrder={SKY_RENDER_ORDER + 2} frustumCulled={false}>
+      <mesh
+         ref={meshRef}
+         position={position}
+         quaternion={quaternion}
+         renderOrder={SKY_RENDER_ORDER + 2}
+         frustumCulled={false}
+      >
          <planeGeometry args={[MOON_QUAD_SIZE, MOON_QUAD_SIZE]} />
          <shaderMaterial
             uniforms={uniforms}
@@ -290,6 +319,14 @@ const SkyDome = () => {
       }),
       []
    )
+
+   useFrame(() => {
+      uniforms.uZenithColor.value.copy(environment.zenith)
+      uniforms.uHorizonColor.value.copy(environment.horizon)
+      uniforms.uMoonDirection.value.copy(environment.primaryDirection)
+      uniforms.uGlowColor.value.set(environment.primaryIsSun ? '#ffb86e' : '#4a6da3')
+      uniforms.uGlowColor.value.multiplyScalar(environment.directStrength)
+   })
 
    return (
       <mesh renderOrder={SKY_RENDER_ORDER} frustumCulled={false}>
@@ -320,6 +357,8 @@ export default function Sky() {
          <SkyDome />
          <Stars />
          <Moon />
+         <Moon sun />
+         <Clouds />
       </group>
    )
 }

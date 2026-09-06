@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react'
-import { useGLTF, useAnimations } from '@react-three/drei'
+import { useAnimations } from '@react-three/drei'
+import { readSceneAsset } from '../Utils/sceneAssets'
+import { avatarUrl } from '../Utils/sceneAssetManifest.js'
 import { GLTF } from 'three-stdlib'
 import { clone as SkeletonUtilsClone } from 'three/examples/jsm/utils/SkeletonUtils'
 import { useGraph } from '@react-three/fiber'
@@ -46,7 +48,7 @@ type ActionName =
 type GLTFActions = Record<ActionName, AnimationAction>
 
 function useSkinnedMeshClone(path) {
-   const { scene, materials, animations } = useGLTF(path) as GLTFResult
+   const { scene, materials, animations } = readSceneAsset(path) as GLTFResult
    const clonedScene = useMemo(() => SkeletonUtilsClone(scene), [scene])
    const { nodes } = useGraph(clonedScene)
    return { scene: clonedScene, materials, animations, nodes }
@@ -73,7 +75,7 @@ export const Avatar = React.memo<AvatarProps>(
          avatarRef.current.rotation.y = avatarRef.current.rotation.y + Math.PI
       }, [rotation])
 
-      const { animations, nodes } = useSkinnedMeshClone('../Models/Player/FullMushy.glb')
+      const { animations, nodes } = useSkinnedMeshClone(avatarUrl)
       // @ts-ignore
       const { actions } = useAnimations<GLTFActions>(animations, avatarRef)
 
@@ -118,5 +120,3 @@ export const Avatar = React.memo<AvatarProps>(
       )
    }
 )
-
-useGLTF.preload('../Models/Player/FullMushy.glb')

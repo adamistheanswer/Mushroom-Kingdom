@@ -1,4 +1,6 @@
 import { decode } from '@msgpack/msgpack'
+import { getWorldTime } from '../world/dayNightCycle.js'
+import { sendMessage } from './messages.js'
 import { performance } from 'node:perf_hooks'
 import { handleChatMessage } from '../chat/chat.js'
 import { handleClientAction, handleClientMovement, handleClientUserName } from '../clients/clientMessages.js'
@@ -36,8 +38,12 @@ const messageHandlers = new Map([
             Boolean(message.payload?.enabled)
       },
    ],
-   // Sent only to keep intermediaries from idling the connection out; there is nothing to do with it.
-   [HEARTBEAT, () => {}],
+   [
+      HEARTBEAT,
+      ({ socket, message }) => {
+         sendMessage(socket, 'worldTime', getWorldTime(Number.isFinite(message.payload) ? message.payload : undefined))
+      },
+   ],
 ])
 
 function decodeClientMessage(data, clientId) {

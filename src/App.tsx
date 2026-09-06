@@ -6,9 +6,11 @@ import Ground from './Environment/Ground'
 import Grass, { DEFAULT_GRASS_WIND_SETTINGS } from './Environment/Grass'
 import GrassWindVisualizer from './Environment/GrassWindVisualizer'
 import Forest from './Environment/Forest'
-import BoundaryWalls from './Environment/BoundaryWalls'
+import BoundaryTerrain from './Environment/BoundaryTerrain'
 import Sky from './Environment/Sky'
+import { synchronizeWorldTime } from './Environment/dayNightState'
 import Loader from './Components/Loader'
+import SceneAssets from './Components/SceneAssets'
 import GrassWindDebugPanel from './Components/GrassWindDebugPanel'
 import RemotePlayers from './Players/RemotePlayers'
 import LocalPlayer from './Players/LocalPlayer'
@@ -32,10 +34,7 @@ import DebugOverlay, {
    instrumentSocketSend,
    SceneDebugSampler,
 } from './Components/DebugOverlay'
-import {
-   decodeClientMetadataUpdateBatch,
-   decodeClientMotionUpdateBatch,
-} from '../shared/clientUpdateProtocol.js'
+import { decodeClientMetadataUpdateBatch, decodeClientMotionUpdateBatch } from '../shared/clientUpdateProtocol.js'
 
 const canvasGlOptions = { powerPreference: 'high-performance' } as const
 const DEBUG_TOOLS_ENABLED = import.meta.env.DEV || new URLSearchParams(window.location.search).has('debug')
@@ -71,7 +70,7 @@ const App: React.FC = () => {
    const sceneDebugStatsRef = useRef(createSceneDebugStats())
    const [grassWindSettings, setGrassWindSettings] = useState(() => ({ ...DEFAULT_GRASS_WIND_SETTINGS }))
    const defaultGrassWindSettingsKeyRef = useRef(DEFAULT_GRASS_WIND_SETTINGS_KEY)
-   const [grassWindVisualizerEnabled, setGrassWindVisualizerEnabled] = useState(true)
+   const [grassWindVisualizerEnabled, setGrassWindVisualizerEnabled] = useState(false)
    const [grassWindVisualizerHeight, setGrassWindVisualizerHeight] = useState(9)
    const [grassWindVisualizerOpacity, setGrassWindVisualizerOpacity] = useState(1)
    const [grassWindVisualizerSize, setGrassWindVisualizerSize] = useState(720)
@@ -134,7 +133,7 @@ const App: React.FC = () => {
 
       const sendHeartbeat = (nextSocket: WebSocket) => {
          if (nextSocket.readyState === WebSocket.OPEN && nextSocket.bufferedAmount < 64 * 1024) {
-            nextSocket.send(encode({ type: 'heartbeat', payload: Date.now() }))
+            nextSocket.send(encode({ type: 'heartbeat', payload: performance.now() }))
          }
       }
 
@@ -178,6 +177,8 @@ const App: React.FC = () => {
             if (message.type === 'largeScenery') {
                setLargeScenery(message.payload)
             }
+
+            if (message.type === 'worldTime') synchronizeWorldTime(message.payload)
 
             if (message.type === 'smallScenery') {
                setSmallScenery(message.payload)
@@ -321,28 +322,30 @@ const App: React.FC = () => {
             <Lighting />
             <Sky />
             <Suspense fallback={<Loader />}>
-               <SceneReadySignal onReady={handleSceneReady} />
-               {socket && <RemotePlayers />}
-               {socket && <LocalPlayer clientSocket={socket} showSpawnEffect={localSpawnEffectReady} />}
-               <Ground />
-               <Grass windSettings={grassWindSettings} />
-               {GRASS_WIND_TUNING_ENABLED && grassWindVisualizerEnabled && (
-                  <GrassWindVisualizer
-                     settings={grassWindSettings}
-                     height={grassWindVisualizerHeight}
-                     opacity={grassWindVisualizerOpacity}
-                     size={grassWindVisualizerSize}
-                  />
-               )}
-               <Forest />
-               <BoundaryWalls />
+               <SceneAssets>
+                  <SceneReadySignal onReady={handleSceneReady} />
+                  {socket && <RemotePlayers />}
+                  {socket && <LocalPlayer clientSocket={socket} showSpawnEffect={localSpawnEffectReady} />}
+                  <Ground />
+                  <Grass windSettings={grassWindSettings} />
+                  {GRASS_WIND_TUNING_ENABLED && grassWindVisualizerEnabled && (
+                     <GrassWindVisualizer
+                        settings={grassWindSettings}
+                        height={grassWindVisualizerHeight}
+                        opacity={grassWindVisualizerOpacity}
+                        size={grassWindVisualizerSize}
+                     />
+                  )}
+                  <Forest />
+                  <BoundaryTerrain />
+               </SceneAssets>
             </Suspense>
          </Canvas>
 
          {/* Every on-screen control sits in the HUD layer so it tracks the visual
              viewport together and stays reachable while the keyboard is up. */}
          <div className="mk-hud">
-            {socket && <OverlayUIWrapper socket={socket} />}
+            {socket && sceneReady && <OverlayUIWrapper socket={socket} />}
             {socket && <MobileJoystick />}
          </div>
 

@@ -1,29 +1,21 @@
 import { useEffect, useState } from 'react'
-import { useProgress } from '@react-three/drei'
+import { sceneAssets } from './sceneAssets'
 
-type LoadingProgress = ReturnType<typeof useProgress.getState>
+type LoadingProgress = ReturnType<typeof sceneAssets.getState>
 
-/**
- * Reads drei's asset loading progress without subscribing to it during render.
- *
- * three fires DefaultLoadingManager.onStart synchronously from inside useLoader, so the
- * store is written while whichever component suspended is still rendering. A component
- * subscribed straight to the store therefore gets updated mid-render of a different
- * component, which React rightly complains about. Mirroring the store into local state on
- * the next frame keeps every one of those updates inside a normal commit instead.
- */
+// Batch updates can happen during Suspense rendering; mirror them on the next frame.
 export const useLoadingProgress = (): LoadingProgress => {
-   const [progress, setProgress] = useState(useProgress.getState)
+   const [progress, setProgress] = useState(sceneAssets.getState)
 
    useEffect(() => {
       let frame = 0
 
       const flush = () => {
          frame = 0
-         setProgress(useProgress.getState())
+         setProgress(sceneAssets.getState())
       }
 
-      const unsubscribe = useProgress.subscribe(() => {
+      const unsubscribe = sceneAssets.subscribe(() => {
          if (!frame) {
             frame = requestAnimationFrame(flush)
          }

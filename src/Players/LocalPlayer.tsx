@@ -15,6 +15,7 @@ import { useIsTyping } from '../Utils/useIsTyping'
 import { usePlayerPositionsStore } from '../State/playerPositionsStore'
 import { isColliding } from '../Utils/isColliding'
 import { isWithinWorldBounds } from '../Utils/isWithinWorldBounds'
+import { PLAYER_COLLISION_RADIUS } from '../constants'
 import useClientAudioStore from '../State/clientsAudioStore'
 import usePlayerActionStore from '../State/playerActionStore'
 import SpawnEffect from './SpawnEffect'
@@ -126,7 +127,10 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
             if ((!isTyping && forward) || forwardJoy !== 0) {
                tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
                nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
-               if (isWithinWorldBounds(nextPosition) && !isColliding(nextPosition, playerPositions.current, tempVector, 5)) {
+               if (
+                  isWithinWorldBounds(nextPosition) &&
+                  !isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)
+               ) {
                   group.position.copy(nextPosition)
                }
                actionsArray.push('Walking')
@@ -135,7 +139,10 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
             if ((!isTyping && backward) || backwardJoy !== 0) {
                tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
                nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
-               if (isWithinWorldBounds(nextPosition) && !isColliding(nextPosition, playerPositions.current, tempVector, 5)) {
+               if (
+                  isWithinWorldBounds(nextPosition) &&
+                  !isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)
+               ) {
                   group.position.copy(nextPosition)
                }
                actionsArray.push('WalkingB')
@@ -144,7 +151,10 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
             if ((!isTyping && left) || leftJoy !== 0) {
                tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
                nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
-               if (isWithinWorldBounds(nextPosition) && !isColliding(nextPosition, playerPositions.current, tempVector, 5)) {
+               if (
+                  isWithinWorldBounds(nextPosition) &&
+                  !isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)
+               ) {
                   group.position.copy(nextPosition)
                }
                if ((!isTyping && backward) || backwardJoy !== 0) {
@@ -157,7 +167,10 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
             if ((!isTyping && right) || rightJoy !== 0) {
                tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
                nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
-               if (isWithinWorldBounds(nextPosition) && !isColliding(nextPosition, playerPositions.current, tempVector, 5)) {
+               if (
+                  isWithinWorldBounds(nextPosition) &&
+                  !isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)
+               ) {
                   group.position.copy(nextPosition)
                }
                if ((!isTyping && backward) || backwardJoy !== 0) {
@@ -186,7 +199,11 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
 
             const currentRotation = [0, roundTo(azimuthAngle, 4), 0]
 
-            const currentPosition = [roundTo(group.position.x, 2), roundTo(group.position.y, 2), roundTo(group.position.z, 2)]
+            const currentPosition = [
+               roundTo(group.position.x, 2),
+               roundTo(group.position.y, 2),
+               roundTo(group.position.z, 2),
+            ]
 
             const currentAction = isTyping
                ? '3'
@@ -233,11 +250,7 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
             microphone={localVoiceState?.microphone}
             speaking={localVoiceState?.speaking}
          />
-         <Avatar
-            position={LOCAL_CHILD_POSITION}
-            rotation={LOCAL_CHILD_ROTATION}
-            action={localAction}
-         />
+         <Avatar position={LOCAL_CHILD_POSITION} rotation={LOCAL_CHILD_ROTATION} action={localAction} />
          <OrbitControls
             ref={orbitRef}
             autoRotate={false}
