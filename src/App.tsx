@@ -70,7 +70,7 @@ const App: React.FC = () => {
    const sceneDebugStatsRef = useRef(createSceneDebugStats())
    const [grassWindSettings, setGrassWindSettings] = useState(() => ({ ...DEFAULT_GRASS_WIND_SETTINGS }))
    const defaultGrassWindSettingsKeyRef = useRef(DEFAULT_GRASS_WIND_SETTINGS_KEY)
-   const [grassWindVisualizerEnabled, setGrassWindVisualizerEnabled] = useState(true)
+   const [grassWindVisualizerEnabled, setGrassWindVisualizerEnabled] = useState(false)
    const [grassWindVisualizerHeight, setGrassWindVisualizerHeight] = useState(9)
    const [grassWindVisualizerOpacity, setGrassWindVisualizerOpacity] = useState(1)
    const [grassWindVisualizerSize, setGrassWindVisualizerSize] = useState(720)

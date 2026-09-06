@@ -361,7 +361,7 @@ function StatRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 const DebugOverlay: React.FC<DebugOverlayProps> = ({ socket, networkStatsRef, sceneStatsRef }) => {
-   const [open, setOpen] = useState(true)
+   const [open, setOpen] = useState(false)
    const [targetBotCount, setTargetBotCount] = useState(0)
    const [updateMs, setUpdateMs] = useState(50)
    const [chatBurstCount, setChatBurstCount] = useState(10)

@@ -103,7 +103,7 @@ const GrassWindDebugPanel: React.FC<GrassWindDebugPanelProps> = ({
    onVisualizerOpacityChange,
    onVisualizerSizeChange,
 }) => {
-   const [open, setOpen] = useState(true)
+   const [open, setOpen] = useState(false)
    const [copied, setCopied] = useState(false)
    const settingsText = useMemo(() => JSON.stringify(settings, null, 3), [settings])
 
