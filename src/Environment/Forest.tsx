@@ -2,48 +2,10 @@ import React, { useLayoutEffect, useMemo, useRef } from 'react'
 import { InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three'
 import { modelUrlMap } from '../Utils/sceneAssetManifest.js'
 import { readSceneAsset } from '../Utils/sceneAssets'
+import { setInstanceScale } from '../Utils/sceneryTransforms.js'
 import useSceneryStore from '../State/SceneryStore'
 
 const Y_AXIS = new Vector3(0, 1, 0)
-
-function seededUnit(seed: number) {
-   return (Math.sin(seed * 127.1) * 43758.5453123) % 1
-}
-
-function randomUnit(seed: number) {
-   const value = seededUnit(seed)
-   return value < 0 ? value + 1 : value
-}
-
-function setInstanceScale(entity, scale: Vector3) {
-   const modelId = entity[0]
-   const baseScale = entity[3]
-   const seed = modelId * 131 + entity[1] * 0.11 + entity[2] * 0.19
-
-   if (modelId >= 16 && modelId <= 17) {
-      scale.set(
-         baseScale * (0.9 + randomUnit(seed + 1) * 0.18),
-         baseScale * (0.82 + randomUnit(seed + 2) * 0.16),
-         baseScale * (0.9 + randomUnit(seed + 3) * 0.18)
-      )
-      return
-   }
-
-   if (modelId < 10) {
-      scale.set(
-         baseScale * (0.94 + randomUnit(seed + 1) * 0.12),
-         baseScale * (0.92 + randomUnit(seed + 2) * 0.2),
-         baseScale * (0.94 + randomUnit(seed + 3) * 0.12)
-      )
-      return
-   }
-
-   scale.set(
-      baseScale * (0.9 + randomUnit(seed + 1) * 0.18),
-      baseScale * (0.94 + randomUnit(seed + 2) * 0.16),
-      baseScale * (0.9 + randomUnit(seed + 3) * 0.18)
-   )
-}
 
 function softenSceneryMaterial(material) {
    if (Array.isArray(material)) {
