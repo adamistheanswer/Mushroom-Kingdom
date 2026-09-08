@@ -14,7 +14,7 @@ import { encode } from '@msgpack/msgpack'
 import { useIsTyping } from '../Utils/useIsTyping'
 import { usePlayerPositionsStore } from '../State/playerPositionsStore'
 import { isColliding } from '../Utils/isColliding'
-import { isWithinWorldBounds } from '../Utils/isWithinWorldBounds'
+import { useSceneryPhysics } from '../Utils/useSceneryPhysics'
 import { PLAYER_COLLISION_RADIUS } from '../constants'
 import useClientAudioStore from '../State/clientsAudioStore'
 import usePlayerActionStore from '../State/playerActionStore'
@@ -63,8 +63,10 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
    const camRef = useRef<any>()
    const groupRef = useRef<Group>(null!)
    const velocity = 25
+   const sceneryPhysics = useSceneryPhysics()
 
    const tempVector = useMemo(() => new Vector3(), [])
+   const displacement = useMemo(() => new Vector3(), [])
    const nextPosition = useMemo(() => new Vector3(), [])
    const cameraOffset = useMemo(() => new Vector3(), [])
    const tempEuler = useMemo(() => new Euler(), [])
@@ -124,39 +126,22 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
          if (group && state.controls && state.camera) {
             const azimuthAngle = state.controls.getAzimuthalAngle()
             const actionsArray: string[] = []
+            displacement.set(0, 0, 0)
             if ((!isTyping && forward) || forwardJoy !== 0) {
                tempVector.set(0, 0, forwardJoy !== 0 ? -forwardJoy : -1).applyAxisAngle(upVector, azimuthAngle)
-               nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
-               if (
-                  isWithinWorldBounds(nextPosition) &&
-                  !isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)
-               ) {
-                  group.position.copy(nextPosition)
-               }
+               displacement.add(tempVector)
                actionsArray.push('Walking')
             }
 
             if ((!isTyping && backward) || backwardJoy !== 0) {
                tempVector.set(0, 0, backwardJoy !== 0 ? backwardJoy : 1).applyAxisAngle(upVector, azimuthAngle)
-               nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
-               if (
-                  isWithinWorldBounds(nextPosition) &&
-                  !isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)
-               ) {
-                  group.position.copy(nextPosition)
-               }
+               displacement.add(tempVector)
                actionsArray.push('WalkingB')
             }
 
             if ((!isTyping && left) || leftJoy !== 0) {
                tempVector.set(leftJoy !== 0 ? -leftJoy : -1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-               nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
-               if (
-                  isWithinWorldBounds(nextPosition) &&
-                  !isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)
-               ) {
-                  group.position.copy(nextPosition)
-               }
+               displacement.add(tempVector)
                if ((!isTyping && backward) || backwardJoy !== 0) {
                   actionsArray.push('StrafeRight')
                } else {
@@ -166,17 +151,21 @@ const LocalPlayerWrapper: React.FC<LocalPlayerWrapperProps> = ({ clientSocket, s
 
             if ((!isTyping && right) || rightJoy !== 0) {
                tempVector.set(rightJoy !== 0 ? rightJoy : 1, 0, 0).applyAxisAngle(upVector, azimuthAngle)
-               nextPosition.copy(group.position).addScaledVector(tempVector, velocity * delta)
-               if (
-                  isWithinWorldBounds(nextPosition) &&
-                  !isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)
-               ) {
-                  group.position.copy(nextPosition)
-               }
+               displacement.add(tempVector)
                if ((!isTyping && backward) || backwardJoy !== 0) {
                   actionsArray.push('StrafeLeft')
                } else {
                   actionsArray.push('StrafeRight')
+               }
+            }
+
+            // One sweep per frame gives consistent diagonal speed and obstacle sliding.
+            if (displacement.lengthSq() > 0 && sceneryPhysics.current) {
+               displacement.clampLength(0, 1).multiplyScalar(velocity * Math.min(delta, 0.1))
+               sceneryPhysics.current.move(group.position, displacement, nextPosition)
+               tempVector.copy(nextPosition).sub(group.position)
+               if (!isColliding(nextPosition, playerPositions.current, tempVector, PLAYER_COLLISION_RADIUS)) {
+                  group.position.copy(nextPosition)
                }
             }
 
